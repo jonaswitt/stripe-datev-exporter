@@ -40,3 +40,4 @@ pids
 .env
 
 .DS_Store
+out/*
