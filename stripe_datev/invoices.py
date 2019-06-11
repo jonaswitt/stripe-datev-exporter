@@ -18,6 +18,11 @@ def listInvoices(fromTime, toTime):
     # print(invoice)
     if invoice.status == "draft" or invoice.status == "void":
       continue
+    if invoice.post_payment_credit_notes_amount == invoice.total:
+      print("Warning: Invoice {} has been fully refunded, skipping".format(invoice.id))
+      continue
+    elif invoice.post_payment_credit_notes_amount > 0:
+      print("Warning: Invoice {} partially refunded - please check".format(invoice.id))
     assert invoice.currency == "eur"
 
     record["invoice_id"] = invoice.id

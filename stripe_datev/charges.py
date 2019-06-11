@@ -16,7 +16,8 @@ def listCharges(fromTime, toTime):
     # print(charge)
     if not charge.paid:
       continue
-    assert not charge.refunded
+    if charge.refunded:
+      continue
 
     record = {
       "id": charge.id,
