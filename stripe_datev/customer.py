@@ -10,8 +10,14 @@ def getCustomerDetails(customer_id):
   if "deleted" in customer and customer.deleted:
     record["name"] = customer.id
   else:
-    record["name"] = customer.description
-    record["country"] = customer.shipping.address.country
+    if customer.description is not None:
+      record["name"] = customer.description
+    else:
+      record["name"] = customer.name
+    if customer.address is not None:
+      record["country"] = customer.address.country
+    elif customer.shipping is not None:
+      record["country"] = customer.shipping.address.country
     if customer.tax_info and customer.tax_info.type == "vat":
       record["vat_id"] = customer.tax_info.tax_id
   return record
