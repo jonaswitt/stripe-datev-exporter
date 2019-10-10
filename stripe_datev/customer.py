@@ -25,9 +25,9 @@ def getCustomerDetails(customer_id):
 def getRevenueAccount(customer):
   if customer["country"] == "DE":
     return "8400"
-  if customer["country"] in ["US", "AU", "CA"]:
+  if customer["country"] in ["US", "AU", "CA", "JE", "CH"]:
     return "8338"
-  if customer["country"] in ["ES", "IT"]:
+  if customer["country"] in ["ES", "IT", "GB"]:
     if "vat_id" in customer:
       return "8336"
     else:
