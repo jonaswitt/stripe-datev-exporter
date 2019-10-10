@@ -5,7 +5,7 @@ from . import customer, output
 
 def listInvoices(fromTime, toTime):
   invoices = stripe.Invoice.list(
-    date={
+    created={
       "gte": int(fromTime.timestamp()),
       "lt": int(toTime.timestamp())
     },
@@ -29,7 +29,7 @@ def listInvoices(fromTime, toTime):
     record["invoice_pdf"] = invoice.invoice_pdf
     record["invoice_number"] = invoice.number
 
-    record["date"] = datetime.fromtimestamp(invoice.date, timezone.utc)
+    record["date"] = datetime.fromtimestamp(invoice.created, timezone.utc)
     record["total"] = decimal.Decimal(invoice.total) / 100
     record["subtotal"] = decimal.Decimal(invoice.subtotal) / 100
     if invoice.tax:

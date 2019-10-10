@@ -7,7 +7,7 @@ import stripe
 from stripe_datev import charges, invoices, payouts, output
 
 stripe.api_key = "sk_live_"
-stripe.api_version = "2018-11-08"
+stripe.api_version = "2019-08-14"
 
 class StripeDatevCli(object):
 
