@@ -1,7 +1,8 @@
 import stripe
-import decimal
+import decimal, math
 from datetime import datetime, timezone, timedelta
 from . import customer, output
+import datedelta
 
 def listInvoices(fromTime, toTime):
   invoices = stripe.Invoice.list(
@@ -170,5 +171,68 @@ def createAccountingRecords(invoices, fromTime, toTime):
         "Beleginfo - Inhalt 7": output.formatDateHuman(invoice["date"]),
       }
       records.append(record)
+
+  return records
+
+def roundCentsDown(dec):
+  return math.floor(dec * 100) / 100
+
+def accrualRecords(invoiceDate, invoiceAmount, customerAccount, revenueAccount, text, firstRevenueDate, revenueSpreadMonths, includeOriginalInvoice=True):
+  records = []
+
+  if includeOriginalInvoice:
+    records.append({
+      "date": invoiceDate,
+      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(invoiceAmount),
+      "Soll/Haben-Kennzeichen": "S",
+      "WKZ Umsatz": "EUR",
+      "Konto": str(customerAccount),
+      "Gegenkonto (ohne BU-Schlüssel)": str(revenueAccount),
+      "Buchungstext": text,
+    })
+
+  revenuePerPeriod = roundCentsDown(invoiceAmount / revenueSpreadMonths)
+  if invoiceDate < firstRevenueDate:
+    accrueAmount = invoiceAmount
+    accrueText = "{} / Rueckstellung ({} Monate)".format(text, revenueSpreadMonths)
+    periodsBooked = 0
+    periodDate = firstRevenueDate
+  else:
+    accrueAmount = invoiceAmount - revenuePerPeriod
+    accrueText = "{} / Rueckstellung Anteilig ({}/{} Monate)".format(text, revenueSpreadMonths-1, revenueSpreadMonths)
+    periodsBooked = 1
+    periodDate = firstRevenueDate + datedelta.MONTH
+
+  records.append({
+    "date": invoiceDate,
+    "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(accrueAmount),
+    "Soll/Haben-Kennzeichen": "S",
+    "WKZ Umsatz": "EUR",
+    "Konto": str(revenueAccount),
+    "Gegenkonto (ohne BU-Schlüssel)": "990",
+    "Buchungstext": accrueText,
+  })
+
+  remainingAmount = accrueAmount
+
+  while periodsBooked < revenueSpreadMonths:
+    if periodsBooked < revenueSpreadMonths - 1:
+      periodAmount = revenuePerPeriod
+    else:
+      periodAmount = remainingAmount
+
+    records.append({
+      "date": periodDate,
+      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(periodAmount),
+      "Soll/Haben-Kennzeichen": "S",
+      "WKZ Umsatz": "EUR",
+      "Konto": "990",
+      "Gegenkonto (ohne BU-Schlüssel)": str(revenueAccount),
+      "Buchungstext": "{} / Aufloesung Rueckstellung Monat {}/{}".format(text, periodsBooked+1, revenueSpreadMonths),
+    })
+
+    periodDate = periodDate + datedelta.MONTH
+    periodsBooked += 1
+    remainingAmount -= periodAmount
 
   return records

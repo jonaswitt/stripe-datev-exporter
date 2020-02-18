@@ -95,5 +95,24 @@ class StripeDatevCli(object):
         with open(os.path.join(datevDir, "EXTF_{}_Aus_Vormonat.csv".format(nextMonth)), 'w', encoding="latin1", errors="replace", newline="\r\n") as fp:
           output.printRecords(fp, records, toTime, nextMonthEnd)
 
+    def run_records(self):
+      records = []
+
+      # Invoice before first revenue period
+      records += invoices.accrualRecords(datetime(2019, 12, 18), 100, 10001, 8338, "Invoice 2", datetime(2020, 1, 1), 12, False)
+
+      # Invoice in first revenue period
+      records += invoices.accrualRecords(datetime(2020, 1, 13), 100, 10002, 8400, "Invoice 2", datetime(2020, 1, 1), 12, False)
+
+      # fromTime = datetime(2020, 1, 1)
+      fromTime = min([r["date"] for r in records])
+      toTime = max([r["date"] for r in records])
+
+      datevDir = os.path.join('out', 'datev')
+      if not os.path.exists(datevDir):
+        os.mkdir(datevDir)
+      with open(os.path.join(datevDir, "EXTF_accrual.csv"), 'w', encoding="latin1", errors="replace", newline="\r\n") as fp:
+          output.printRecords(fp, records, fromTime, toTime)
+
 if __name__ == '__main__':
     StripeDatevCli(sys.argv).run()
