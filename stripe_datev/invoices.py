@@ -4,21 +4,39 @@ from datetime import datetime, timezone, timedelta
 from . import customer, output
 import datedelta
 
+def listFinalizedInvoices(fromTime, toTime):
+  starting_after = None
+  while True:
+    response = stripe.Invoice.list(
+      starting_after=starting_after,
+      created={
+        "lt": int(toTime.timestamp())
+      },
+      due_date={
+        "gte": int(fromTime.timestamp()),
+      },
+      limit=10,
+    )
+    # print("Fetched {} invoices".format(len(response.data)))
+    if len(response.data) == 0:
+      break
+    starting_after = response.data[-1].id
+    for invoice in response.data:
+      if invoice.status == "draft" or invoice.status == "void":
+        continue
+      created_date = datetime.fromtimestamp(invoice.created, timezone.utc)
+      due_date = datetime.fromtimestamp(invoice.due_date, timezone.utc)
+      finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc)
+      if finalized_date < fromTime or finalized_date >= toTime:
+        # print("Skipping invoice {}, created {} finalized {} due {}".format(invoice.id, created_date, finalized_date, due_date))
+        continue
+      yield invoice
+
 def listInvoices(fromTime, toTime):
-  invoices = stripe.Invoice.list(
-    created={
-      "gte": int(fromTime.timestamp()),
-      "lt": int(toTime.timestamp())
-    },
-    limit=100, # TODO: pagination
-  )
   invoiceRecords = []
-  for invoice in invoices:
+  for invoice in listFinalizedInvoices(fromTime, toTime):
     record = {}
 
-    # print(invoice)
-    if invoice.status == "draft" or invoice.status == "void":
-      continue
     if invoice.post_payment_credit_notes_amount == invoice.total:
       if invoice.total > 0:
         print("Warning: Invoice {} has been fully refunded, skipping".format(invoice.id))
@@ -31,7 +49,8 @@ def listInvoices(fromTime, toTime):
     record["invoice_pdf"] = invoice.invoice_pdf
     record["invoice_number"] = invoice.number
 
-    record["date"] = datetime.fromtimestamp(invoice.created, timezone.utc)
+    finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc)
+    record["date"] = finalized_date
     record["total"] = decimal.Decimal(invoice.total) / 100
     record["subtotal"] = decimal.Decimal(invoice.subtotal) / 100
     if invoice.tax:
