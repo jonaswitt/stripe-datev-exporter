@@ -170,27 +170,27 @@ def createAccountingRecords(invoices, fromTime, toTime):
         }
         records.append(auflRecord)
 
-    tax = invoice.get("tax", 0)
-    if tax > 0:
-      text = "{} / Umsatzsteuer".format(prefix)
-      record = {
-        "date": invoice["date"],
-        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(tax),
-        "Soll/Haben-Kennzeichen": "S",
-        "WKZ Umsatz": "EUR",
-        "Konto": customer.getCustomerAccount(invoice["customer"]),
-        "Gegenkonto (ohne BU-Schlüssel)": "1777",
-        "Buchungstext": text,
-        "Beleginfo - Art 3": "Gegenpartei",
-        "Beleginfo - Inhalt 3": invoice["customer"]["name"],
-        "Beleginfo - Art 4": "Rechnungsnummer",
-        "Beleginfo - Inhalt 4": invoice["invoice_number"],
-        "Beleginfo - Art 5": "Betrag",
-        "Beleginfo - Inhalt 5": output.formatDecimal(lineItem["amount"]),
-        "Beleginfo - Art 7": "Rechnungsdatum",
-        "Beleginfo - Inhalt 7": output.formatDateHuman(invoice["date"]),
-      }
-      records.append(record)
+    # tax = invoice.get("tax", 0)
+    # if tax > 0:
+    #   text = "{} / Umsatzsteuer".format(prefix)
+    #   record = {
+    #     "date": invoice["date"],
+    #     "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(tax),
+    #     "Soll/Haben-Kennzeichen": "S",
+    #     "WKZ Umsatz": "EUR",
+    #     "Konto": customer.getCustomerAccount(invoice["customer"]),
+    #     "Gegenkonto (ohne BU-Schlüssel)": "1777",
+    #     "Buchungstext": text,
+    #     "Beleginfo - Art 3": "Gegenpartei",
+    #     "Beleginfo - Inhalt 3": invoice["customer"]["name"],
+    #     "Beleginfo - Art 4": "Rechnungsnummer",
+    #     "Beleginfo - Inhalt 4": invoice["invoice_number"],
+    #     "Beleginfo - Art 5": "Betrag",
+    #     "Beleginfo - Inhalt 5": output.formatDecimal(lineItem["amount"]),
+    #     "Beleginfo - Art 7": "Rechnungsdatum",
+    #     "Beleginfo - Inhalt 7": output.formatDateHuman(invoice["date"]),
+    #   }
+    #   records.append(record)
 
   return records
 
