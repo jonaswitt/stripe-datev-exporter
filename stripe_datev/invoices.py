@@ -100,7 +100,7 @@ def createAccountingRecords(invoices, fromTime, toTime):
         percentInCurrentPeriod = (toTime - lineItem["period_start"]) / (lineItem["period_end"] - lineItem["period_start"])
         nextPeriodAmount = decimal.Decimal(float(currentPeriodAmount) * (1 - percentInCurrentPeriod) * 100).to_integral_exact() / 100
 
-      prefix = "Stripe Invoice {}".format(invoice["invoice_number"])
+      prefix = "Invoice {}".format(invoice["invoice_number"])
       text = "{} / {}".format(prefix, lineItem["description"])
       record = {
         "date": invoice["date"],
