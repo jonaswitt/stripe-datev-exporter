@@ -42,3 +42,42 @@ def getBookingType(customer, tax_percent):
   if customer["country"] == "DE" and tax_percent == 19:
     return "9"
   return "0"
+
+def all_customers():
+  starting_after = None
+  while True:
+    response = stripe.Customer.list(
+      starting_after=starting_after,
+      limit=10
+    )
+    # print("Fetched {} customers".format(len(response.data)))
+    if len(response.data) == 0:
+      break
+    starting_after = response.data[-1].id
+    for item in response.data:
+      yield item
+
+def validate_customers():
+  for customer in all_customers():
+    # print(customer)
+    if not customer.address:
+      print("Warning: customer without address", customer.id)
+      continue
+
+    country = customer.address.country
+    tax_exempt = customer.tax_exempt
+    vat_id = customer.tax_info.tax_id if customer.tax_info is not None else None
+
+    if country == "DE":
+      if tax_exempt != "none":
+        print("Warning: DE customer tax status is", tax_exempt, customer.id)
+
+    elif tax_exempt == "reverse":
+      if country in ["ES", "IT", "GB"] and vat_id is None:
+        print("Warning: EU reverse charge customer without VAT ID", customer.id)
+
+    # elif tax_exempt == "none":
+    #   print("Warning: configure taxation for", country, "customer", customer.id)
+
+    elif tax_exempt == "exempt":
+      print("Warning: exempt customer", customer.id)

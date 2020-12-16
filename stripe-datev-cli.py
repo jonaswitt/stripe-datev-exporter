@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import datedelta
 import pytz
 import stripe
-from stripe_datev import charges, invoices, payouts, output
+from stripe_datev import charges, invoices, payouts, output, customer
 import os, os.path
 import requests
 
@@ -113,6 +113,9 @@ class StripeDatevCli(object):
         os.mkdir(datevDir)
       with open(os.path.join(datevDir, "EXTF_accrual.csv"), 'w', encoding="latin1", errors="replace", newline="\r\n") as fp:
           output.printRecords(fp, records, fromTime, toTime)
+
+    def run_validate_customers(self):
+      customer.validate_customers()
 
 if __name__ == '__main__':
     StripeDatevCli(sys.argv).run()
