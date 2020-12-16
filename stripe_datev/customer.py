@@ -20,27 +20,60 @@ def getCustomerDetails(customer_id):
       record["country"] = customer.shipping.address.country
     if customer.tax_info and customer.tax_info.type == "vat":
       record["vat_id"] = customer.tax_info.tax_id
+    if customer.tax_exempt:
+      record["tax_exempt"] = customer.tax_exempt
   return record
 
-def getRevenueAccount(customer):
-  if customer["country"] == "DE":
+def getRevenueAccount(customer, invoice):
+  country = customer.get("country", None)
+  invoice_tax = invoice.get("tax", None)
+  tax_exempt = customer.get("tax_exempt", None)
+  # TODO: use tax status at time of invoice creation
+  # tax_exempt = invoice.get("customer_tax_exempt", None)
+  vat_id = customer.get("vat_id", None)
+
+  if country == "DE":
+    if invoice_tax is None:
+      print("Warning: no tax in DE invoice", invoice["id"])
+    if tax_exempt != "none":
+      print("Warning: DE customer tax status is", tax_exempt, customer["id"])
     return "8400"
-  if customer["country"] in ["US", "AU", "CA", "JE", "CH", "VI"]:
-    return "8338"
-  if customer["country"] in ["ES", "IT", "GB"]:
-    if "vat_id" in customer:
-      return "8336"
-    else:
-      return "8339"
-  print("Warning: using generic revenue account for customer {}".format(customer))
+
+  if tax_exempt == "reverse":
+    if invoice_tax is not None:
+      print("Warning: tax on invoice of reverse charge customer", invoice["id"])
+    if country in ["ES", "IT", "GB"] and vat_id is None:
+      print("Warning: EU reverse charge customer without VAT ID")
+    return "8337"
+
+  elif tax_exempt == "none":
+    print("Warning: configure taxation for", country, "customer", customer["id"])
+
+  elif tax_exempt == "exempt":
+    print("Warning: exempt customer, treating like 'reverse'", customer["id"])
+    return "8337"
+
+  else:
+    print("Warning: unknown tax status for customer", customer["id"])
+
   return "8000"
 
 def getCustomerAccount(customer):
   return "10001"
 
-def getBookingType(customer, tax_percent):
-  if customer["country"] == "DE" and tax_percent == 19:
+def getDatevTaxKey(customer, invoice):
+  country = customer.get("country", None)
+  invoice_tax = invoice.get("tax", None)
+  tax_exempt = customer.get("tax_exempt", None)
+  # TODO: use tax status at time of invoice creation
+  # tax_exempt = invoice.get("customer_tax_exempt", None)
+
+  if country == "DE":
     return "9"
+
+  if tax_exempt == "reverse":
+    return "94"
+
   return "0"
 
 def all_customers():

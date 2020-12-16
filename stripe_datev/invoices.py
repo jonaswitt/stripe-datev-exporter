@@ -60,6 +60,7 @@ def listInvoices(fromTime, toTime):
     else:
       record["total_before_tax"] = record["total"]
 
+    record["customer_tax_exempt"] = invoice.customer_tax_exempt
     record["charge_id"] = invoice.charge
 
     lines = []
@@ -107,8 +108,8 @@ def createAccountingRecords(invoices, fromTime, toTime):
         "Soll/Haben-Kennzeichen": "S",
         "WKZ Umsatz": "EUR",
         "Konto": customer.getCustomerAccount(invoice["customer"]),
-        "Gegenkonto (ohne BU-Schlüssel)": customer.getRevenueAccount(invoice["customer"]),
-        # "BU-Schlüssel": customer.getBookingType(invoice["customer"], invoice.get("tax_percent", 0)),
+        "Gegenkonto (ohne BU-Schlüssel)": customer.getRevenueAccount(invoice["customer"], invoice),
+        "BU-Schlüssel": customer.getDatevTaxKey(invoice["customer"], invoice),
         # "Belegdatum": output.formatDateDatev(invoice["date"]),
         # "Belegfeld 1": invoice["invoice_number"],
         "Buchungstext": text,
@@ -147,7 +148,7 @@ def createAccountingRecords(invoices, fromTime, toTime):
           "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(nextPeriodAmount),
           "Soll/Haben-Kennzeichen": "S",
           "WKZ Umsatz": "EUR",
-          "Konto": customer.getRevenueAccount(invoice["customer"]),
+          "Konto": customer.getRevenueAccount(invoice["customer"], invoice),
           "Gegenkonto (ohne BU-Schlüssel)": "990",
           # "Belegdatum": output.formatDateDatev(invoice["date"]),
           # "Belegfeld 1": invoice["invoice_number"],
@@ -162,7 +163,7 @@ def createAccountingRecords(invoices, fromTime, toTime):
           "Soll/Haben-Kennzeichen": "S",
           "WKZ Umsatz": "EUR",
           "Konto": "990",
-          "Gegenkonto (ohne BU-Schlüssel)": customer.getRevenueAccount(invoice["customer"]),
+          "Gegenkonto (ohne BU-Schlüssel)": customer.getRevenueAccount(invoice["customer"], invoice),
           # "Belegdatum": output.formatDateDatev(nextMonth),
           # "Belegfeld 1": invoice["invoice_number"],
           "Buchungstext": text,
