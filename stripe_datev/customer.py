@@ -24,57 +24,95 @@ def getCustomerDetails(customer_id):
       record["tax_exempt"] = customer.tax_exempt
   return record
 
-def getRevenueAccount(customer, invoice):
+country_codes_eu = [
+  "AT",
+  "BE",
+  "BG",
+  "CY",
+  "CZ",
+  "DK",
+  "EE",
+  "FI",
+  "FR",
+  "DE",
+  "GR",
+  "HU",
+  "IE",
+  "IT",
+  "LV",
+  "LT",
+  "LU",
+  "MT",
+  "NL",
+  "PL",
+  "PT",
+  "RO",
+  "SK",
+  "SI",
+  "ES",
+  "SE",
+  "GB"
+]
+
+def getAccountingProps(customer, invoice=None):
   country = customer.get("country", None)
-  invoice_tax = invoice.get("tax", None)
+  invoice_tax = invoice.get("tax", None) if invoice is not None else None
   tax_exempt = customer.get("tax_exempt", None)
   # TODO: use tax status at time of invoice creation
-  # tax_exempt = invoice.get("customer_tax_exempt", None)
+  # tax_exempt = invoice.get("customer_tax_exempt", None) if invoice is not None else None
   vat_id = customer.get("vat_id", None)
+
+  props = {
+    "country": country,
+    "vat_id": vat_id,
+    "tax_exempt": tax_exempt,
+    "invoice_tax": invoice_tax,
+    "customer_account": "10001",
+    "vat_region": "World",
+  }
 
   if country == "DE":
     if invoice_tax is None:
       print("Warning: no tax in DE invoice", invoice["id"])
     if tax_exempt != "none":
       print("Warning: DE customer tax status is", tax_exempt, customer["id"])
-    return "8400"
+    props["revenue_account"] = "8400"
+    props["datev_tax_key"] = "9"
+    props["vat_region"] = "DE"
+    return props
 
-  if tax_exempt == "reverse":
+  if country in country_codes_eu:
+    props["vat_region"] = "EU"
+
+  if tax_exempt == "reverse" or tax_exempt == "exempt":
+    if tax_exempt == "exempt":
+      print("Warning: exempt customer, treating like 'reverse'", customer["id"])
     if invoice_tax is not None:
       print("Warning: tax on invoice of reverse charge customer", invoice["id"])
-    if country in ["ES", "IT", "GB"] and vat_id is None:
+    if country in country_codes_eu and vat_id is None:
       print("Warning: EU reverse charge customer without VAT ID")
-    return "8337"
+    props["revenue_account"] = "8337"
+    props["datev_tax_key"] = "94"
+    return props
 
   elif tax_exempt == "none":
     print("Warning: configure taxation for", country, "customer", customer["id"])
 
-  elif tax_exempt == "exempt":
-    print("Warning: exempt customer, treating like 'reverse'", customer["id"])
-    return "8337"
-
   else:
     print("Warning: unknown tax status for customer", customer["id"])
 
-  return "8000"
+  props["revenue_account"] = "8000"
+  props["datev_tax_key"] = "0"
+  return props
+
+def getRevenueAccount(customer, invoice):
+  return getAccountingProps(customer, invoice)["revenue_account"]
 
 def getCustomerAccount(customer):
-  return "10001"
+  return getAccountingProps(customer)["customer_account"]
 
 def getDatevTaxKey(customer, invoice):
-  country = customer.get("country", None)
-  invoice_tax = invoice.get("tax", None)
-  tax_exempt = customer.get("tax_exempt", None)
-  # TODO: use tax status at time of invoice creation
-  # tax_exempt = invoice.get("customer_tax_exempt", None)
-
-  if country == "DE":
-    return "9"
-
-  if tax_exempt == "reverse":
-    return "94"
-
-  return "0"
+  return getAccountingProps(customer, invoice)["datev_tax_key"]
 
 def all_customers():
   starting_after = None
