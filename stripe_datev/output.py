@@ -163,6 +163,7 @@ def printRecords(textFileHandle, records, fromTime, toTime):
       continue
 
     record["Belegdatum"] = formatDateDatev(record["date"])
+    record["Buchungstext"] = "\"{}\"".format(record["Buchungstext"])
 
     # print(record)
     recordValues = [record.get(f, '') for f in fields]
