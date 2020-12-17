@@ -5,7 +5,7 @@ from . import output
 
 def listPayouts(fromTime, toTime):
   payouts = stripe.Payout.list(
-    arrival_date={
+    created={
       "gte": int(fromTime.timestamp()),
       "lt": int(toTime.timestamp())
     },
@@ -21,7 +21,7 @@ def listPayouts(fromTime, toTime):
     record = {
       "id": payout.id,
       "amount": decimal.Decimal(payout.amount) / 100,
-      "arrival_date": datetime.fromtimestamp(payout.arrival_date, timezone.utc),
+      "arrival_date": datetime.fromtimestamp(payout.created, timezone.utc),
       "description": payout.description,
     }
 
