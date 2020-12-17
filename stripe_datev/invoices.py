@@ -91,55 +91,52 @@ def createAccountingRecords(invoices, fromTime, toTime):
   for invoice in invoices:
     # print(invoice)
 
+    prefix = "Invoice {}".format(invoice["invoice_number"])
+    record = {
+      "date": invoice["date"],
+      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(invoice["total"]),
+      "Soll/Haben-Kennzeichen": "S",
+      "WKZ Umsatz": "EUR",
+      "Konto": customer.getCustomerAccount(invoice["customer"]),
+      "Gegenkonto (ohne BU-Schlüssel)": customer.getRevenueAccount(invoice["customer"], invoice),
+      "BU-Schlüssel": customer.getDatevTaxKey(invoice["customer"], invoice),
+      # "Belegdatum": output.formatDateDatev(invoice["date"]),
+      # "Belegfeld 1": invoice["invoice_number"],
+      "Buchungstext": prefix,
+
+      # "Beleginfo - Art 1": "Belegnummer",
+      # "Beleginfo - Inhalt 1": invoice["invoice_number"],
+
+      # "Beleginfo - Art 2": "Produkt",
+      # "Beleginfo - Inhalt 2": lineItem["description"],
+
+      # "Beleginfo - Art 3": "Gegenpartei",
+      # "Beleginfo - Inhalt 3": invoice["customer"]["name"],
+
+      # "Beleginfo - Art 4": "Rechnungsnummer",
+      # "Beleginfo - Inhalt 4": invoice["invoice_number"],
+
+      # "Beleginfo - Art 5": "Betrag",
+      # "Beleginfo - Inhalt 5": output.formatDecimal(lineItem["amount"]),
+
+      # "Beleginfo - Art 6": "Umsatzsteuer",
+      # "Beleginfo - Inhalt 6": invoice.get("tax_percent", 0),
+
+      # "Beleginfo - Art 7": "Rechnungsdatum",
+      # "Beleginfo - Inhalt 7": output.formatDateHuman(invoice["date"]),
+
+      # "EU-Land u. UStID": invoice["customer"]["vat_id"],
+      # "EU-Steuersatz": invoice.get("tax_percent", ""),
+
+    }
+    records.append(record)
+
     for lineItem in invoice["lines"]:
-      # print(lineItem)
       currentPeriodAmount = lineItem["amount_discounted"]
       nextPeriodAmount = None
-
       if "period_end" in lineItem and lineItem["period_end"] > toTime:
         percentInCurrentPeriod = (toTime - lineItem["period_start"]) / (lineItem["period_end"] - lineItem["period_start"])
         nextPeriodAmount = decimal.Decimal(float(currentPeriodAmount) * (1 - percentInCurrentPeriod) * 100).to_integral_exact() / 100
-
-      prefix = "Invoice {}".format(invoice["invoice_number"])
-      text = "{} / {}".format(prefix, lineItem["description"])
-      record = {
-        "date": invoice["date"],
-        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(currentPeriodAmount),
-        "Soll/Haben-Kennzeichen": "S",
-        "WKZ Umsatz": "EUR",
-        "Konto": customer.getCustomerAccount(invoice["customer"]),
-        "Gegenkonto (ohne BU-Schlüssel)": customer.getRevenueAccount(invoice["customer"], invoice),
-        "BU-Schlüssel": customer.getDatevTaxKey(invoice["customer"], invoice),
-        # "Belegdatum": output.formatDateDatev(invoice["date"]),
-        # "Belegfeld 1": invoice["invoice_number"],
-        "Buchungstext": text,
-
-        # "Beleginfo - Art 1": "Belegnummer",
-        # "Beleginfo - Inhalt 1": invoice["invoice_number"],
-
-        # "Beleginfo - Art 2": "Produkt",
-        # "Beleginfo - Inhalt 2": lineItem["description"],
-
-        "Beleginfo - Art 3": "Gegenpartei",
-        "Beleginfo - Inhalt 3": invoice["customer"]["name"],
-
-        "Beleginfo - Art 4": "Rechnungsnummer",
-        "Beleginfo - Inhalt 4": invoice["invoice_number"],
-
-        "Beleginfo - Art 5": "Betrag",
-        "Beleginfo - Inhalt 5": output.formatDecimal(lineItem["amount"]),
-
-        # "Beleginfo - Art 6": "Umsatzsteuer",
-        # "Beleginfo - Inhalt 6": invoice.get("tax_percent", 0),
-
-        "Beleginfo - Art 7": "Rechnungsdatum",
-        "Beleginfo - Inhalt 7": output.formatDateHuman(invoice["date"]),
-
-        # "EU-Land u. UStID": invoice["customer"]["vat_id"],
-        # "EU-Steuersatz": invoice.get("tax_percent", ""),
-
-      }
-      records.append(record)
 
       if nextPeriodAmount is not None:
         text = "{} / Anteilig Rueckstellung".format(prefix, lineItem["description"])
@@ -169,28 +166,6 @@ def createAccountingRecords(invoices, fromTime, toTime):
           "Buchungstext": text,
         }
         records.append(auflRecord)
-
-    # tax = invoice.get("tax", 0)
-    # if tax > 0:
-    #   text = "{} / Umsatzsteuer".format(prefix)
-    #   record = {
-    #     "date": invoice["date"],
-    #     "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(tax),
-    #     "Soll/Haben-Kennzeichen": "S",
-    #     "WKZ Umsatz": "EUR",
-    #     "Konto": customer.getCustomerAccount(invoice["customer"]),
-    #     "Gegenkonto (ohne BU-Schlüssel)": "1777",
-    #     "Buchungstext": text,
-    #     "Beleginfo - Art 3": "Gegenpartei",
-    #     "Beleginfo - Inhalt 3": invoice["customer"]["name"],
-    #     "Beleginfo - Art 4": "Rechnungsnummer",
-    #     "Beleginfo - Inhalt 4": invoice["invoice_number"],
-    #     "Beleginfo - Art 5": "Betrag",
-    #     "Beleginfo - Inhalt 5": output.formatDecimal(lineItem["amount"]),
-    #     "Beleginfo - Art 7": "Rechnungsdatum",
-    #     "Beleginfo - Inhalt 7": output.formatDateHuman(invoice["date"]),
-    #   }
-    #   records.append(record)
 
   return records
 
