@@ -70,6 +70,9 @@ class StripeDatevCli(object):
         records += invoices.createAccountingRecords(invoiceObjects, fromTime, toTime)
         # print(records)
 
+        with open("out/overview-{:04d}-{:02d}.csv".format(year, month), "w", encoding="utf-8") as fp:
+          fp.write(invoices.to_csv(invoiceObjects))
+
         chargeObjects = charges.listCharges(fromTime, toTime)
         # print(chargeObjects)
 

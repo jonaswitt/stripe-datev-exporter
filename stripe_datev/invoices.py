@@ -194,6 +194,54 @@ def createAccountingRecords(invoices, fromTime, toTime):
 
   return records
 
+def to_csv(inv):
+  lines = [[
+    "invoice_id",
+    "invoice_number",
+    "date",
+
+    "total_before_tax",
+    "tax",
+    "tax_percent",
+    "total",
+
+    "customer_id",
+    "customer_name",
+    "country",
+    "vat_region",
+    "vat_id",
+    "tax_exempt",
+
+    "customer_account",
+    "revenue_account",
+    "datev_tax_key",
+  ]]
+  for invoice in inv:
+    props = customer.getAccountingProps(invoice["customer"], invoice)
+    lines.append([
+      invoice["invoice_id"],
+      invoice["invoice_number"],
+      invoice["date"].astimezone(output.berlin).strftime("%Y-%m-%d"),
+
+      format(invoice["total_before_tax"], ".2f"),
+      format(invoice["tax"], ".2f") if "tax" in invoice else None,
+      format(invoice["tax_percent"], ".0f") if "tax_percent" in invoice else None,
+      format(invoice["total"], ".2f"),
+
+      invoice["customer"]["id"],
+      invoice["customer"]["name"],
+      props["country"],
+      props["vat_region"],
+      props["vat_id"],
+      props["tax_exempt"],
+
+      props["customer_account"],
+      props["revenue_account"],
+      props["datev_tax_key"],
+    ])
+
+  return "\n".join(map(lambda l: ",".join(map(lambda f: f if f is not None else "", l)), lines))
+
 def roundCentsDown(dec):
   return math.floor(dec * 100) / 100
 
