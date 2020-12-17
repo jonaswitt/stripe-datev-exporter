@@ -69,15 +69,16 @@ def getAccountingProps(customer, invoice=None):
     "invoice_tax": invoice_tax,
     "customer_account": "10001",
     "vat_region": "World",
+    "datev_tax_key": "",
   }
 
   if country == "DE":
-    if invoice_tax is None:
+    if invoice is not None and invoice_tax is None:
       print("Warning: no tax in DE invoice", invoice["id"])
     if tax_exempt != "none":
       print("Warning: DE customer tax status is", tax_exempt, customer["id"])
     props["revenue_account"] = "8400"
-    props["datev_tax_key"] = "9"
+    # props["datev_tax_key"] = "9"
     props["vat_region"] = "DE"
     return props
 
@@ -92,7 +93,7 @@ def getAccountingProps(customer, invoice=None):
     if country in country_codes_eu and vat_id is None:
       print("Warning: EU reverse charge customer without VAT ID")
     props["revenue_account"] = "8337"
-    props["datev_tax_key"] = "94"
+    # props["datev_tax_key"] = "94"
     return props
 
   elif tax_exempt == "none":
@@ -101,8 +102,7 @@ def getAccountingProps(customer, invoice=None):
   else:
     print("Warning: unknown tax status for customer", customer["id"])
 
-  props["revenue_account"] = "8000"
-  props["datev_tax_key"] = "0"
+  props["revenue_account"] = "8400"
   return props
 
 def getRevenueAccount(customer, invoice):
