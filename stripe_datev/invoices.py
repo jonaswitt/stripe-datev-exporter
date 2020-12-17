@@ -87,7 +87,7 @@ def listInvoices(fromTime, toTime):
 
 def createAccountingRecords(invoices, fromTime, toTime):
   records = []
-  nextMonth = toTime + timedelta(1)
+  nextMonth = toTime + timedelta(seconds=7200)
   for invoice in invoices:
     # print(invoice)
 
