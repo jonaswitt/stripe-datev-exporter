@@ -42,6 +42,12 @@ class StripeDatevCli(object):
         invoiceObjects = invoices.listInvoices(fromTime, toTime)
         # print(invoiceObjects)
 
+        with open("out/overview/overview-{:04d}-{:02d}.csv".format(year, month), "w", encoding="utf-8") as fp:
+          fp.write(invoices.to_csv(invoiceObjects))
+
+        with open("out/monthly_recognition/monthly_recognition-{:04d}-{:02d}.csv".format(year, month), "w", encoding="utf-8") as fp:
+          fp.write(invoices.to_recognized_month_csv(invoiceObjects))
+
         pdfDir = os.path.join('out', 'pdf')
         if not os.path.exists(pdfDir):
           os.mkdir(pdfDir)
@@ -69,9 +75,6 @@ class StripeDatevCli(object):
 
         records += invoices.createAccountingRecords(invoiceObjects, fromTime, toTime)
         # print(records)
-
-        with open("out/overview-{:04d}-{:02d}.csv".format(year, month), "w", encoding="utf-8") as fp:
-          fp.write(invoices.to_csv(invoiceObjects))
 
         chargeObjects = charges.listCharges(fromTime, toTime)
         # print(chargeObjects)

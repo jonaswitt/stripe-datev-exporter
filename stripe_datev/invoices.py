@@ -1,11 +1,18 @@
+import json
+from stripe_datev import recognition
+import pytz
 import stripe
 import decimal, math
 from datetime import datetime, timezone, timedelta
-from . import customer, output
+from . import customer, output, dateparser
 import datedelta
+import os, os.path
 
-def listFinalizedInvoices(fromTime, toTime):
+accounting_tz = output.berlin
+
+def listFinalizedInvoices(fromTime, toTime, cache=True):
   starting_after = None
+  invoices = []
   while True:
     response = stripe.Invoice.list(
       starting_after=starting_after,
@@ -15,11 +22,10 @@ def listFinalizedInvoices(fromTime, toTime):
       due_date={
         "gte": int(fromTime.timestamp()),
       },
-      limit=10,
+      limit=50,
+      expand=["data.customer"],
     )
-    # print("Fetched {} invoices".format(len(response.data)))
-    if len(response.data) == 0:
-      break
+    print("Fetched {} invoices".format(len(response.data)))
     starting_after = response.data[-1].id
     for invoice in response.data:
       if invoice.status == "draft" or invoice.status == "void":
@@ -30,12 +36,18 @@ def listFinalizedInvoices(fromTime, toTime):
       if finalized_date < fromTime or finalized_date >= toTime:
         # print("Skipping invoice {}, created {} finalized {} due {}".format(invoice.id, created_date, finalized_date, due_date))
         continue
-      yield invoice
+      invoices.append(invoice)
+    if len(response.data) == 0 or not response.has_more:
+      break
+
+  return list(reversed(invoices))
 
 def listInvoices(fromTime, toTime):
   invoiceRecords = []
   for invoice in listFinalizedInvoices(fromTime, toTime):
-    record = {}
+    record = {
+      "raw": invoice
+    }
 
     if invoice.post_payment_credit_notes_amount == invoice.total:
       if invoice.total > 0:
@@ -204,7 +216,7 @@ def to_csv(inv):
       format(invoice["total"], ".2f"),
 
       invoice["customer"]["id"],
-      invoice["customer"]["name"],
+      invoice["customer"]["name"].replace(",", ";"),
       props["country"],
       props["vat_region"],
       props["vat_id"],
@@ -216,6 +228,85 @@ def to_csv(inv):
     ])
 
   return "\n".join(map(lambda l: ",".join(map(lambda f: f if f is not None else "", l)), lines))
+
+def to_recognized_month_csv(invoices):
+  lines = [[
+    "invoice_id",
+    "invoice_number",
+    "invoice_date",
+    "recognition_start",
+    "recognition_end",
+    "recognition_month",
+
+    "line_item_idx",
+    "line_item_desc",
+    "line_item_net",
+
+    "customer_id",
+    "customer_name",
+    "country",
+  ]]
+  for inv2 in invoices:
+    inv = inv2["raw"]
+
+    props = customer.getAccountingProps(inv2["customer"], inv2)
+
+    created = accounting_tz.localize(datetime.fromtimestamp(inv["created"])) if "created" in inv else None
+    for line_item_idx, line_item in enumerate(reversed(inv.get("lines", {}).get("data", []))):
+      start = None
+      end = None
+      if "period" in line_item:
+        start = datetime.fromtimestamp(line_item["period"]["start"]).replace(tzinfo=pytz.utc)
+        end = datetime.fromtimestamp(line_item["period"]["end"]).replace(tzinfo=pytz.utc)
+      if start == end:
+        start = None
+        end = None
+
+      # if start is None and end is None:
+      #   desc_parts = line_item.get("description", "").split(";")
+      #   if len(desc_parts) >= 3:
+      #     date_parts = desc_parts[-1].strip().split(" ")
+      #     start = accounting_tz.localize(datetime.strptime("{} {} {}".format(date_parts[1], date_parts[2][:-2], date_parts[3]), "%b %d %Y"))
+      #     end = start + timedelta(seconds=24 * 60 * 60 - 1)
+
+      if start is None and end is None:
+        try:
+          date_range = dateparser.find_date_range(line_item.get("description"), created, accounting_tz)
+          if date_range is not None:
+            start, end = date_range
+
+        except Exception as ex:
+          print(ex)
+          pass
+
+      if start is None and end is None:
+        print("Warning: unknown period for line item --", inv["id"], line_item.get("description"))
+        start = created
+        end = created
+
+      # else:
+      #   print("Period", start, end, "--", line_item.get("description"))
+
+      for month in recognition.split_months(start, end, [decimal.Decimal(line_item["amount"]) / 100]):
+        lines.append([
+          inv2["invoice_id"],
+          inv2["invoice_number"],
+          inv2["date"].astimezone(output.berlin).strftime("%Y-%m-%d"),
+          start.strftime("%Y-%m-%d"),
+          end.strftime("%Y-%m-%d"),
+          month["start"].strftime("%Y-%m") + "-01",
+
+          str(line_item_idx + 1),
+          line_item.get("description").replace(",", ";"),
+          format(month["amounts"][0], ".2f"),
+
+          inv2["customer"]["id"],
+          inv2["customer"]["name"].replace(",", ";"),
+          props["country"],
+        ])
+
+  return "\n".join(map(lambda l: ",".join(map(lambda f: f if f is not None else "", l)), lines))
+
 
 def roundCentsDown(dec):
   return math.floor(dec * 100) / 100

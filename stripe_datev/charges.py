@@ -26,7 +26,7 @@ def listCharges(fromTime, toTime):
       "description": charge.description,
     }
 
-    record["customer"] = customer.getCustomerDetails(charge.customer)
+    record["customer"] = customer.getCustomerDetails(stripe.Customer.retrieve(charge.customer))
 
     balance_transaction = stripe.BalanceTransaction.retrieve(charge.balance_transaction)
     # print(balance_transaction)

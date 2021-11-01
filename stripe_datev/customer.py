@@ -1,9 +1,6 @@
 import stripe
 
-def getCustomerDetails(customer_id):
-  customer = stripe.Customer.retrieve(customer_id)
-  # print(customer)
-
+def getCustomerDetails(customer):
   record = {
     "id": customer.id
   }
@@ -88,15 +85,22 @@ def getAccountingProps(customer, invoice=None):
     if tax_exempt == "exempt":
       print("Warning: exempt customer, treating like 'reverse'", customer["id"])
     if invoice_tax is not None:
-      print("Warning: tax on invoice of reverse charge customer", invoice["id"])
+      print("Warning: tax on invoice of reverse charge customer", invoice.get("id", "n/a") if invoice is not None else "n/a")
     if country in country_codes_eu and vat_id is None:
       print("Warning: EU reverse charge customer without VAT ID")
-    props["revenue_account"] = "8337"
+
+    if country in country_codes_eu and vat_id is None:
+      props["revenue_account"] = "8336"
+    else:
+      props["revenue_account"] = "8338"
+
     # props["datev_tax_key"] = "94"
     return props
 
   elif tax_exempt == "none":
-    print("Warning: configure taxation for", country, "customer", customer["id"])
+    # print("Warning: configure taxation for", country, "customer", customer["id"])
+    # Unter Bagtellgrenze MOSS
+    pass
 
   else:
     print("Warning: unknown tax status for customer", customer["id"])
