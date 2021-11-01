@@ -51,7 +51,6 @@ country_codes_eu = [
   "SI",
   "ES",
   "SE",
-  "GB"
 ]
 
 def getAccountingProps(customer, invoice=None):
