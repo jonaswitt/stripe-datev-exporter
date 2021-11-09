@@ -69,8 +69,13 @@ class DateParserTestSuite(unittest.TestCase):
 
   def assertStringRange(self, strRange, start, end):
     r = find_date_range(strRange, ref_date=self.ref_date, tz=self.tz)
-    self.assertEqual(r[0], self.tz.localize(start), "Start of range does not match: '{}'".format(strRange))
-    self.assertEqual(r[1], self.tz.localize(end), "End of range does not match: '{}'".format(strRange))
+    if r is None:
+      self.assertIsNone(start)
+    else:
+      self.assertIsNotNone(start)
+      self.assertIsNotNone(end)
+      self.assertEqual(r[0], self.tz.localize(start), "Start of range does not match: '{}'".format(strRange))
+      self.assertEqual(r[1], self.tz.localize(end), "End of range does not match: '{}'".format(strRange))
 
   def test_parsing(self):
     self.assertStringRange(
