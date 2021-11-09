@@ -1,5 +1,5 @@
 import json
-from stripe_datev import recognition
+from stripe_datev import recognition, csv
 import pytz
 import stripe
 import decimal, math
@@ -216,7 +216,7 @@ def to_csv(inv):
       format(invoice["total"], ".2f"),
 
       invoice["customer"]["id"],
-      invoice["customer"]["name"].replace(",", ";"),
+      invoice["customer"]["name"],
       props["country"],
       props["vat_region"],
       props["vat_id"],
@@ -227,7 +227,7 @@ def to_csv(inv):
       props["datev_tax_key"],
     ])
 
-  return "\n".join(map(lambda l: ",".join(map(lambda f: f if f is not None else "", l)), lines))
+  return csv.lines_to_csv(lines)
 
 def to_recognized_month_csv(invoices):
   lines = [[
@@ -299,15 +299,15 @@ def to_recognized_month_csv(invoices):
           month["start"].strftime("%Y-%m") + "-01",
 
           str(line_item_idx + 1),
-          line_item.get("description").replace(",", ";"),
+          line_item.get("description"),
           format(month["amounts"][0], ".2f"),
 
           inv2["customer"]["id"],
-          inv2["customer"]["name"].replace(",", ";"),
+          inv2["customer"]["name"],
           props["country"],
         ])
 
-  return "\n".join(map(lambda l: ",".join(map(lambda f: f if f is not None else "", l)), lines))
+  return csv.lines_to_csv(lines)
 
 
 def roundCentsDown(dec):
