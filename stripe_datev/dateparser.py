@@ -39,6 +39,8 @@ def find_date_range(text, ref_date=None, tz=None):
   else:
     if not foundYear:
       return None
+    if len(days) > 0:
+      return None
     month1 = 1
     month2 = 12
 
@@ -106,6 +108,11 @@ class DateParserTestSuite(unittest.TestCase):
     self.assertStringRange(
       "Njord Analytics & Njord Player; 2x Laser Radial; valid November 1st 2021 to December 31st 2024 (price per year)",
       datetime.datetime(2021, 11, 1), datetime.datetime(2024, 12, 31, 23, 59, 59)
+    )
+
+    self.assertStringRange(
+      "Njord Player, TP52, Menorca (Sat 25th - 30th 2021)",
+      None, None
     )
 
 if __name__ == '__main__':
