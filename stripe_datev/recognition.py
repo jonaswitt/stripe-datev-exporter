@@ -18,7 +18,7 @@ def split_months(start, end, amounts):
   months = []
   while current_month <= end:
     start_of_month = current_month.replace(day=1, hour=0, minute=0, second=0)
-    end_of_month = current_month.replace(day=calendar.monthrange(current_month.year, current_month.month)[1], hour=23, minute=59, second=59)
+    end_of_month = start_of_month.tzinfo.localize(current_month.replace(day=calendar.monthrange(current_month.year, current_month.month)[1], hour=23, minute=59, second=59, tzinfo=None))
 
     month_duration = min(end, end_of_month) - max(start, start_of_month) + datetime.timedelta(seconds=1)
     perc_of_total = decimal.Decimal.from_float(month_duration / total_duration)
