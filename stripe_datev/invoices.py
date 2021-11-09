@@ -251,6 +251,8 @@ def to_recognized_month_csv(invoices):
 
     props = customer.getAccountingProps(inv2["customer"], inv2)
 
+    invoice_discount = decimal.Decimal(((inv.get("discount", None) or {}).get("coupon", None) or {}).get("percent_off", 0))
+
     created = accounting_tz.localize(datetime.fromtimestamp(inv["created"])) if "created" in inv else None
     for line_item_idx, line_item in enumerate(reversed(inv.get("lines", {}).get("data", []))):
       start = None
@@ -287,7 +289,7 @@ def to_recognized_month_csv(invoices):
       # else:
       #   print("Period", start, end, "--", line_item.get("description"))
 
-      for month in recognition.split_months(start, end, [decimal.Decimal(line_item["amount"]) / 100]):
+      for month in recognition.split_months(start, end, [decimal.Decimal(line_item["amount"]) / 100 * (1 - invoice_discount / 100)]):
         lines.append([
           inv2["invoice_id"],
           inv2["invoice_number"],
