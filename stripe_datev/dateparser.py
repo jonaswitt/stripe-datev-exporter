@@ -2,17 +2,35 @@ import calendar
 import datetime
 import re
 
-MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-MONTHS_LONG = ["January","February","March","April","May","June","July","August","September","October","November","December"]
+MONTHS = [
+  ["Jan", "January"],
+  ["Feb", "February"],
+  ["Mar", "March"],
+  ["Apr", "April"],
+  ["May"],
+  ["Jun", "June"],
+  ["Jul", "July"],
+  ["Aug", "August"],
+  ["Sep", "Sept", "September"],
+  ["Oct", "October"],
+  ["Nov", "November"],
+  ["Dec", "December"],
+]
+
+def flatten(t):
+    return [item for sublist in t for item in sublist]
 
 YEAR_REGEX = re.compile("(?<=[\D^])(2019|2020|2021|2022|2023|2024|2025|2026)(?=\D|$)", re.M)
-MONTH_REGEX = re.compile("(?<=[\W^])({})(?=\W|$)".format("|".join(MONTHS)), re.M)
-MONTH_LONG_REGEX = re.compile("(?<=[\W^])({})(?=\W|$)".format("|".join(MONTHS_LONG)), re.M)
+MONTH_REGEX = re.compile("(?<=[\W^])({})(?=\W|$)".format("|".join(flatten(MONTHS))), re.M)
 DAY_REGEX = re.compile("(?<=[\D^])([0-9]{1,2})(?:st|nd|rd|th)(?=\W|$)", re.M)
 
 def find_date_range(text, ref_date=None, tz=None):
   years = [int(y) for y in YEAR_REGEX.findall(text)]
-  months = [MONTHS_LONG.index(m) + 1 for m in MONTH_LONG_REGEX.findall(text)] + [MONTHS.index(m) + 1 for m in MONTH_REGEX.findall(text)]
+  months = []
+  for match in MONTH_REGEX.findall(text):
+    for month_idx, patterns in enumerate(MONTHS):
+      if next((pattern for pattern in patterns if re.match(pattern, match)), None):
+        months.append(month_idx + 1)
   days = [int(d) for d in DAY_REGEX.findall(text)]
   # print(years, months, days)
 
@@ -114,6 +132,11 @@ class DateParserTestSuite(unittest.TestCase):
     self.assertStringRange(
       "Njord Player, TP52, Menorca (Sat 25th - 30th 2021)",
       None, None
+    )
+
+    self.assertStringRange(
+      "Njord Analytics and Player; M32; valid Sept 1st 2021 - Sept 4th 2022",
+      datetime.datetime(2021, 9, 1), datetime.datetime(2022, 9, 4, 23, 59, 59)
     )
 
 if __name__ == '__main__':
