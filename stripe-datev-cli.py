@@ -65,11 +65,9 @@ class StripeDatevCli(object):
 
           print("Downloading {} to {}".format(pdfLink, filePath))
           r = requests.get(pdfLink)
-
           if r.status_code != 200:
             print("HTTP status {}".format(r.status_code))
             continue
-
           with open(filePath, "wb") as fp:
             fp.write(r.content)
 
@@ -78,6 +76,22 @@ class StripeDatevCli(object):
 
         chargeObjects = charges.listCharges(fromTime, toTime)
         # print(chargeObjects)
+
+        for charge in chargeObjects:
+          fileName = "{} {}.html".format(charge["created"].replace(tzinfo=berlin).strftime("%Y-%m-%d"), charge.get("receipt_number", charge["id"]))
+          filePath = os.path.join(pdfDir, fileName)
+          if os.path.exists(filePath):
+            # print("{} exists, skipping".format(filePath))
+            continue
+
+          pdfLink = charge["receipt_url"]
+          print("Downloading {} to {}".format(pdfLink, filePath))
+          r = requests.get(pdfLink)
+          if r.status_code != 200:
+            print("HTTP status {}".format(r.status_code))
+            continue
+          with open(filePath, "wb") as fp:
+            fp.write(r.content)
 
         records += charges.createAccountingRecords(chargeObjects)
         # print(records)

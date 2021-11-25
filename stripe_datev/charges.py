@@ -30,6 +30,8 @@ def listCharges(fromTime, toTime):
         "amount": decimal.Decimal(charge.amount) / 100,
         "created": datetime.fromtimestamp(charge.created, timezone.utc),
         "description": charge.description,
+        "receipt_number": charge.receipt_number,
+        "receipt_url": charge.receipt_url,
       }
 
       record["customer"] = customer.getCustomerDetails(stripe.Customer.retrieve(charge.customer))
