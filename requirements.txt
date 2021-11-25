@@ -2,6 +2,7 @@ certifi==2018.11.29
 chardet==3.0.4
 datedelta==1.2
 idna==2.8
+python-dotenv=0.19.2
 pytz==2018.9
 requests==2.21.0
 stripe==2.63.0

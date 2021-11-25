@@ -7,8 +7,15 @@ import stripe
 from stripe_datev import charges, invoices, payouts, output, customer
 import os, os.path
 import requests
+import dotenv
 
-stripe.api_key = "sk_live_"
+dotenv.load_dotenv()
+
+if "STRIPE_API_KEY" not in os.environ:
+  print("Require STRIPE_API_KEY environment variable to be set")
+  sys.exit(1)
+
+stripe.api_key = os.environ["STRIPE_API_KEY"]
 stripe.api_version = "2019-08-14"
 
 out_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'out')
