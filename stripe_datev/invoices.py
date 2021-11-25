@@ -25,7 +25,9 @@ def listFinalizedInvoices(fromTime, toTime, cache=True):
       limit=50,
       expand=["data.customer"],
     )
-    print("Fetched {} invoices".format(len(response.data)))
+    # print("Fetched {} invoices".format(len(response.data)))
+    if len(response.data) == 0:
+      break
     starting_after = response.data[-1].id
     for invoice in response.data:
       if invoice.status == "draft" or invoice.status == "void":
@@ -37,7 +39,8 @@ def listFinalizedInvoices(fromTime, toTime, cache=True):
         # print("Skipping invoice {}, created {} finalized {} due {}".format(invoice.id, created_date, finalized_date, due_date))
         continue
       invoices.append(invoice)
-    if len(response.data) == 0 or not response.has_more:
+
+    if not response.has_more:
       break
 
   return list(reversed(invoices))

@@ -4,38 +4,48 @@ from datetime import datetime, timezone
 from . import customer, output
 
 def listCharges(fromTime, toTime):
-  charges = stripe.Charge.list(
-    created={
-      "gte": int(fromTime.timestamp()),
-      "lt": int(toTime.timestamp())
-    },
-    limit=100, # TODO: pagination
-  )
+  starting_after = None
   chargeRecords = []
-  for charge in charges:
-    # print(charge)
-    if not charge.paid:
-      continue
-    if charge.refunded:
-      continue
+  while True:
+    response = stripe.Charge.list(
+      starting_after=starting_after,
+      created={
+        "gte": int(fromTime.timestamp()),
+        "lt": int(toTime.timestamp())
+      },
+      limit=50,
+    )
+    if len(response.data) == 0:
+      break
+    starting_after = response.data[-1].id
 
-    record = {
-      "id": charge.id,
-      "amount": decimal.Decimal(charge.amount) / 100,
-      "created": datetime.fromtimestamp(charge.created, timezone.utc),
-      "description": charge.description,
-    }
+    for charge in response.data:
+      if not charge.paid:
+        continue
+      if charge.refunded:
+        continue
 
-    record["customer"] = customer.getCustomerDetails(stripe.Customer.retrieve(charge.customer))
+      record = {
+        "id": charge.id,
+        "amount": decimal.Decimal(charge.amount) / 100,
+        "created": datetime.fromtimestamp(charge.created, timezone.utc),
+        "description": charge.description,
+      }
 
-    balance_transaction = stripe.BalanceTransaction.retrieve(charge.balance_transaction)
-    # print(balance_transaction)
-    assert len(balance_transaction.fee_details) == 1
-    assert balance_transaction.fee_details[0].currency == "eur"
-    record["fee_amount"] = decimal.Decimal(balance_transaction.fee_details[0].amount) / 100
-    record["fee_desc"] = balance_transaction.fee_details[0].description
+      record["customer"] = customer.getCustomerDetails(stripe.Customer.retrieve(charge.customer))
 
-    chargeRecords.append(record)
+      balance_transaction = stripe.BalanceTransaction.retrieve(charge.balance_transaction)
+      # print(balance_transaction)
+      assert len(balance_transaction.fee_details) == 1
+      assert balance_transaction.fee_details[0].currency == "eur"
+      record["fee_amount"] = decimal.Decimal(balance_transaction.fee_details[0].amount) / 100
+      record["fee_desc"] = balance_transaction.fee_details[0].description
+
+      chargeRecords.append(record)
+
+    if not response.has_more:
+      break
+
   print("Retrieved {} charge(s), total {} EUR (fees: {} EUR)".format(len(chargeRecords), sum([r["amount"] for r in chargeRecords]), sum([r["fee_amount"] for r in chargeRecords])))
   return chargeRecords
 
