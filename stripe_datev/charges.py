@@ -43,6 +43,17 @@ def listCharges(fromTime, toTime):
       record["fee_amount"] = decimal.Decimal(balance_transaction.fee_details[0].amount) / 100
       record["fee_desc"] = balance_transaction.fee_details[0].description
 
+      if charge.invoice is None:
+        record["no_invoice"] = True
+
+        if not charge.description and charge.payment_intent:
+          try:
+            response = stripe.checkout.Session.list(payment_intent=charge.payment_intent, expand=["data.line_items"])
+            record["checkout_session"] = response.data[0]
+            record["description"] = ", ".join(map(lambda li: li.description, response.data[0].line_items.data))
+          except:
+            pass
+
       chargeRecords.append(record)
 
     if not response.has_more:
@@ -54,14 +65,16 @@ def listCharges(fromTime, toTime):
 def createAccountingRecords(charges):
   records = []
   for charge in charges:
-    text = "{} {}".format(charge["description"] or "Stripe Payment", charge["id"])
+    acc_props = customer.getAccountingProps(charge["customer"], checkout_session=charge.get("checkout_session", None))
+
+    text = "Stripe Payment ({})".format(charge["id"])
     record = {
       "date": charge["created"],
       "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(charge["amount"]),
       "Soll/Haben-Kennzeichen": "S",
       "WKZ Umsatz": "EUR",
       "Konto": "1201",
-      "Gegenkonto (ohne BU-Schlüssel)": customer.getCustomerAccount(charge["customer"]),
+      "Gegenkonto (ohne BU-Schlüssel)": acc_props["customer_account"],
       # "BU-Schlüssel": "0",
       # "Belegdatum": output.formatDateDatev(charge["created"]),
       # "Belegfeld 1": charge["id"],
@@ -94,7 +107,7 @@ def createAccountingRecords(charges):
     }
     records.append(record)
 
-    text = "{} {} {}".format(charge["description"] or "", charge["fee_desc"] or "Stripe Fee", charge["id"])
+    text = "{} ({})".format(charge["fee_desc"] or "Stripe Fee", charge["id"])
     record = {
       "date": charge["created"],
       "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(charge["fee_amount"]),
@@ -108,20 +121,21 @@ def createAccountingRecords(charges):
     }
     records.append(record)
 
-    # text = "{} Reverse Charge IE3206488LH {}".format(charge["fee_desc"] or "Stripe Fee", charge["id"])
-    # record = {
-    #   "date": charge["created"],
-    #   "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(charge["fee_amount"]),
-    #   "Soll/Haben-Kennzeichen": "S",
-    #   "WKZ Umsatz": "EUR",
-    #   "Konto": "1577",
-    #   "Gegenkonto (ohne BU-Schlüssel)": "1787",
-    #   "Buchungstext": text,
-    #   "Beleginfo - Art 5": "Betrag",
-    #   "Beleginfo - Inhalt 5": output.formatDecimal(charge["fee_amount"]),
-    # }
-    # records.append(record)
+    if charge.get("no_invoice", False):
+      text = "Receipt {}".format(charge.get("receipt_number", charge["id"]))
+      # text = "{} (receipt no {} / {} - direct charge without invoice)".format(charge.get("description", "Stripe Charge"), charge.get("receipt_number", "n/a"), charge["id"])
 
+      record = {
+        "date": charge["created"],
+        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(charge["amount"]),
+        "Soll/Haben-Kennzeichen": "S",
+        "WKZ Umsatz": "EUR",
+        "Konto": acc_props["customer_account"],
+        "Gegenkonto (ohne BU-Schlüssel)": acc_props["revenue_account"],
+        "BU-Schlüssel": acc_props["datev_tax_key"],
+        "Buchungstext": text,
+      }
+      records.append(record)
 
   return records
 
