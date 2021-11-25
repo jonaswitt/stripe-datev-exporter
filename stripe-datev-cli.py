@@ -11,6 +11,12 @@ import requests
 stripe.api_key = "sk_live_"
 stripe.api_version = "2019-08-14"
 
+out_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'out')
+if stripe.api_key.startswith("sk_test"):
+  out_dir = os.path.join(out_dir, "test")
+if not os.path.exists(out_dir):
+  os.mkdir(out_dir)
+
 class StripeDatevCli(object):
 
     def __init__(self, argv):
@@ -42,13 +48,21 @@ class StripeDatevCli(object):
         invoiceObjects = invoices.listInvoices(fromTime, toTime)
         # print(invoiceObjects)
 
-        with open("out/overview/overview-{:04d}-{:02d}.csv".format(year, month), "w", encoding="utf-8") as fp:
+        overview_dir = os.path.join(out_dir, "overview")
+        if not os.path.exists(overview_dir):
+          os.mkdir(overview_dir)
+
+        with open(os.path.join(overview_dir, "overview-{:04d}-{:02d}.csv".format(year, month)), "w", encoding="utf-8") as fp:
           fp.write(invoices.to_csv(invoiceObjects))
 
-        with open("out/monthly_recognition/monthly_recognition-{:04d}-{:02d}.csv".format(year, month), "w", encoding="utf-8") as fp:
+        monthly_recognition_dir = os.path.join(out_dir, "monthly_recognition")
+        if not os.path.exists(monthly_recognition_dir):
+          os.mkdir(monthly_recognition_dir)
+
+        with open(os.path.join(monthly_recognition_dir, "monthly_recognition-{:04d}-{:02d}.csv".format(year, month)), "w", encoding="utf-8") as fp:
           fp.write(invoices.to_recognized_month_csv(invoiceObjects))
 
-        pdfDir = os.path.join('out', 'pdf')
+        pdfDir = os.path.join(out_dir, 'pdf')
         if not os.path.exists(pdfDir):
           os.mkdir(pdfDir)
 
@@ -102,7 +116,7 @@ class StripeDatevCli(object):
         records += payouts.createAccountingRecords(payoutObjects)
         # print(records)
 
-        datevDir = os.path.join('out', 'datev')
+        datevDir = os.path.join(out_dir, 'datev')
         if not os.path.exists(datevDir):
           os.mkdir(datevDir)
 
@@ -128,7 +142,7 @@ class StripeDatevCli(object):
       fromTime = min([r["date"] for r in records])
       toTime = max([r["date"] for r in records])
 
-      datevDir = os.path.join('out', 'datev')
+      datevDir = os.path.join(out_dir, 'datev')
       if not os.path.exists(datevDir):
         os.mkdir(datevDir)
       with open(os.path.join(datevDir, "EXTF_accrual.csv"), 'w', encoding="latin1", errors="replace", newline="\r\n") as fp:
