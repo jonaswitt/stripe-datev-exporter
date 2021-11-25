@@ -60,7 +60,7 @@ class StripeDatevCli(object):
           fileName = "{} {}.pdf".format(invDate.replace(tzinfo=berlin).strftime("%Y-%m-%d"), invNo)
           filePath = os.path.join(pdfDir, fileName)
           if os.path.exists(filePath):
-            print("{} exists, skipping".format(filePath))
+            # print("{} exists, skipping".format(filePath))
             continue
 
           print("Downloading {} to {}".format(pdfLink, filePath))
