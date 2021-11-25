@@ -20,7 +20,7 @@ def listCharges(fromTime, toTime):
     starting_after = response.data[-1].id
 
     for charge in response.data:
-      if not charge.paid:
+      if not charge.paid or not charge.captured:
         continue
       if charge.refunded:
         continue
