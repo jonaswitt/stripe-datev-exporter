@@ -95,12 +95,12 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
       print("Warning: tax exempt customer, treating like 'reverse'", customer["id"])
       props["tax_exempt"] = "reverse"
     if tax_exempt == "none":
-      print("Warning: taxable customer without tax on invoice, treating like 'reverse'", customer["id"])
+      print("Warning: taxable customer without tax on invoice, treating like 'reverse'", customer["id"], invoice.get("id", "n/a") if invoice is not None else "n/a")
       props["tax_exempt"] = "reverse"
     if not (invoice_tax is None or invoice_tax == 0):
       print("Warning: tax on invoice of reverse charge customer", invoice.get("id", "n/a") if invoice is not None else "n/a")
     if country in country_codes_eu and vat_id is None:
-      print("Warning: EU reverse charge customer without VAT ID")
+      print("Warning: EU reverse charge customer without VAT ID", customer["id"])
 
     if country in country_codes_eu and vat_id is None:
       props["revenue_account"] = "8336"
@@ -124,8 +124,8 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
 def getRevenueAccount(customer, invoice=None, checkout_session=None):
   return getAccountingProps(customer, invoice=invoice, checkout_session=checkout_session)["revenue_account"]
 
-def getCustomerAccount(customer, checkout_session=None):
-  return getAccountingProps(customer, checkout_session=checkout_session)["customer_account"]
+def getCustomerAccount(customer, invoice=None, checkout_session=None):
+  return getAccountingProps(customer, invoice=invoice, checkout_session=checkout_session)["customer_account"]
 
 def getDatevTaxKey(customer, invoice=None, checkout_session=None):
   return getAccountingProps(customer, invoice=invoice, checkout_session=checkout_session)["datev_tax_key"]

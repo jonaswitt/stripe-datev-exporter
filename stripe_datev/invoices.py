@@ -112,7 +112,7 @@ def createAccountingRecords(invoices, fromTime, toTime):
       "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(invoice["total"]),
       "Soll/Haben-Kennzeichen": "S",
       "WKZ Umsatz": "EUR",
-      "Konto": customer.getCustomerAccount(invoice["customer"]),
+      "Konto": customer.getCustomerAccount(invoice["customer"], invoice=invoice),
       "Gegenkonto (ohne BU-Schlüssel)": customer.getRevenueAccount(invoice["customer"], invoice),
       "BU-Schlüssel": customer.getDatevTaxKey(invoice["customer"], invoice),
       # "Belegdatum": output.formatDateDatev(invoice["date"]),
