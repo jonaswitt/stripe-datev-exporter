@@ -37,7 +37,7 @@ def find_date_range(text, ref_date=None, tz=None):
   foundYear = True
   if len(years) >= 2:
     year1 = years[0]
-    year2 = years[-1]
+    year2 = years[1]
   elif len(years) == 1:
     year1 = years[0]
     year2 = years[0]
@@ -50,7 +50,7 @@ def find_date_range(text, ref_date=None, tz=None):
 
   if len(months) >= 2:
     month1 = months[0]
-    month2 = months[-1]
+    month2 = months[1]
   elif len(months) == 1:
     month1 = months[0]
     month2 = months[0]
@@ -64,7 +64,7 @@ def find_date_range(text, ref_date=None, tz=None):
 
   if len(days) >= 2:
     day1 = days[0]
-    day2 = days[-1]
+    day2 = days[1]
   elif len(days) == 1:
     day1 = days[0]
     day2 = days[0]
@@ -137,6 +137,11 @@ class DateParserTestSuite(unittest.TestCase):
     self.assertStringRange(
       "Njord Analytics and Player; M32; valid Sept 1st 2021 - Sept 4th 2022",
       datetime.datetime(2021, 9, 1), datetime.datetime(2022, 9, 4, 23, 59, 59)
+    )
+
+    self.assertStringRange(
+      "Njord Analytics & Njord Player, SailGP (8 boats), valid Jan 1st 2022 - Mar 31st 2022 (incl. loading all data from 2021/22 SailGP season)",
+      datetime.datetime(2022, 1, 1), datetime.datetime(2022, 3, 31, 23, 59, 59)
     )
 
 if __name__ == '__main__':
