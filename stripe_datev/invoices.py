@@ -248,6 +248,8 @@ def to_recognized_month_csv(invoices):
     "customer_id",
     "customer_name",
     "country",
+
+    "accounting_date",
   ]]
   for inv2 in invoices:
     inv = inv2["raw"]
@@ -292,11 +294,19 @@ def to_recognized_month_csv(invoices):
       # else:
       #   print("Period", start, end, "--", line_item.get("description"))
 
+      invoice_date = inv2["date"].astimezone(output.berlin)
+
       for month in recognition.split_months(start, end, [decimal.Decimal(line_item["amount"]) / 100 * (1 - invoice_discount / 100)]):
+        month_start = month["start"]
+        if month_start.year <= invoice_date.year:
+          accounting_date = invoice_date
+        else:
+          accounting_date = datetime(month_start.year, 1, 1, tzinfo=output.berlin)
+
         lines.append([
           inv2["invoice_id"],
           inv2["invoice_number"],
-          inv2["date"].astimezone(output.berlin).strftime("%Y-%m-%d"),
+          invoice_date.strftime("%Y-%m-%d"),
           start.strftime("%Y-%m-%d"),
           end.strftime("%Y-%m-%d"),
           month["start"].strftime("%Y-%m") + "-01",
@@ -308,6 +318,8 @@ def to_recognized_month_csv(invoices):
           inv2["customer"]["id"],
           inv2["customer"]["name"],
           props["country"],
+
+          accounting_date.strftime("%Y-%m-%d"),
         ])
 
   return csv.lines_to_csv(lines)
