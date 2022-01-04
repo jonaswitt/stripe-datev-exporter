@@ -127,7 +127,25 @@ fields = [
 
 berlin = pytz.timezone('Europe/Berlin')
 
-def printRecords(textFileHandle, records, fromTime, toTime):
+def filterRecords(records, fromTime=None, toTime=None):
+  return list(filter(lambda r: (fromTime is None or r["date"] >= fromTime) and (toTime is None or r["date"] <= toTime), records))
+
+def writeRecords(fileName, records, fromTime=None, toTime=None):
+  if len(records) == 0:
+    return
+  with open(fileName, 'w', encoding="latin1", errors="replace", newline="\r\n") as fp:
+    printRecords(fp, records, fromTime=fromTime, toTime=toTime)
+
+def printRecords(textFileHandle, records, fromTime=None, toTime=None):
+  if fromTime is not None or toTime is not None:
+    records = filterRecords(records, fromTime, toTime)
+
+  minTime = fromTime or min([r["date"] for r in records])
+  maxTime = toTime or max([r["date"] for r in records])
+  years = set(r["date"].astimezone(berlin).strftime("%Y") for r in records)
+  if len(years) > 1:
+    raise Exception("May not print records from multiple years: {}".format(years))
+
   header = [
     '"EXTF"', # DATEV-Format (DTVF - von DATEV erzeugt, EXTF Fremdprogramm)
     '700', # Version des DATEV-Formats (141 bedeutet 1.41)
@@ -141,10 +159,10 @@ def printRecords(textFileHandle, records, fromTime, toTime):
     '', # importiert von
     '1', # Beraternummer
     '1', # Mandantennummer
-    fromTime.astimezone(berlin).strftime('%Y') + '0101', # Wirtschaftsjahresbeginn
+    minTime.astimezone(berlin).strftime('%Y') + '0101', # Wirtschaftsjahresbeginn
     '4', # Sachkontenlänge
-    fromTime.astimezone(berlin).strftime('%Y%m%d'), # Datum Beginn Buchungsstapel
-    toTime.astimezone(berlin).strftime('%Y%m%d'), # Datum Ende Buchungsstapel
+    minTime.astimezone(berlin).strftime('%Y%m%d'), # Datum Beginn Buchungsstapel
+    maxTime.astimezone(berlin).strftime('%Y%m%d'), # Datum Ende Buchungsstapel
     '', # Bezeichnung (Vorlaufname, z. B. Buchungsstapel)
     '', # Diktatkürzel
     '1', # Buchungstyp (bei Buchungsstapel = 1)
@@ -159,9 +177,6 @@ def printRecords(textFileHandle, records, fromTime, toTime):
   textFileHandle.write("\n")
 
   for record in records:
-    if record["date"] > toTime or record["date"] < fromTime:
-      continue
-
     record["Belegdatum"] = formatDateDatev(record["date"])
     record["Buchungstext"] = "\"{}\"".format(record["Buchungstext"])
 
