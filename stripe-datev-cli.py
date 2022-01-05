@@ -16,7 +16,7 @@ if "STRIPE_API_KEY" not in os.environ:
   sys.exit(1)
 
 stripe.api_key = os.environ["STRIPE_API_KEY"]
-stripe.api_version = "2019-08-14"
+stripe.api_version = "2020-08-27"
 
 out_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'out')
 if stripe.api_key.startswith("sk_test"):
