@@ -1,11 +1,11 @@
 import stripe
 import decimal
 from datetime import datetime, timezone
-from . import customer, output
+from . import customer, output, dateparser
 
-def listCharges(fromTime, toTime):
+def listChargesRaw(fromTime, toTime):
   starting_after = None
-  chargeRecords = []
+  charges = []
   while True:
     response = stripe.Charge.list(
       starting_after=starting_after,
@@ -25,117 +25,118 @@ def listCharges(fromTime, toTime):
       if charge.refunded:
         continue
 
-      record = {
-        "id": charge.id,
-        "amount": decimal.Decimal(charge.amount) / 100,
-        "created": datetime.fromtimestamp(charge.created, timezone.utc),
-        "description": charge.description,
-        "receipt_number": charge.receipt_number,
-        "receipt_url": charge.receipt_url,
-      }
-
-      record["customer"] = customer.getCustomerDetails(stripe.Customer.retrieve(charge.customer))
-
-      balance_transaction = stripe.BalanceTransaction.retrieve(charge.balance_transaction)
-      # print(balance_transaction)
-      assert len(balance_transaction.fee_details) == 1
-      assert balance_transaction.fee_details[0].currency == "eur"
-      record["fee_amount"] = decimal.Decimal(balance_transaction.fee_details[0].amount) / 100
-      record["fee_desc"] = balance_transaction.fee_details[0].description
-
-      if charge.invoice is None:
-        record["no_invoice"] = True
-
-        if not charge.description and charge.payment_intent:
-          try:
-            response = stripe.checkout.Session.list(payment_intent=charge.payment_intent, expand=["data.line_items"])
-            record["checkout_session"] = response.data[0]
-            record["description"] = ", ".join(map(lambda li: li.description, response.data[0].line_items.data))
-          except:
-            pass
-
-      chargeRecords.append(record)
+      charges.append(charge)
 
     if not response.has_more:
       break
 
-  print("Retrieved {} charge(s), total {} EUR (fees: {} EUR)".format(len(chargeRecords), sum([r["amount"] for r in chargeRecords]), sum([r["fee_amount"] for r in chargeRecords])))
-  return chargeRecords
+  return charges
+
+def chargeHasInvoice(charge):
+  return charge.invoice is not None
+
+checkoutSessionsByPaymentIntent = {}
+
+def getCheckoutSessionViaPaymentIntentCached(id):
+  if id in checkoutSessionsByPaymentIntent:
+    return checkoutSessionsByPaymentIntent[id]
+  sessions = stripe.checkout.Session.list(payment_intent=id, expand=["data.line_items"]).data
+  if len(sessions) > 0:
+    session = sessions[0]
+  else:
+    session = None
+  checkoutSessionsByPaymentIntent[id] = session
+  return session
+
+def getChargeDescription(charge):
+  if not charge.description and charge.payment_intent:
+    try:
+      session = getCheckoutSessionViaPaymentIntentCached(charge.payment_intent)
+      return ", ".join(map(lambda li: li.description, session.line_items.data))
+    except:
+      pass
+  return charge.description
+
+def getChargeRecognitionRange(charge):
+  desc = getChargeDescription(charge)
+  created = datetime.fromtimestamp(charge.created, timezone.utc)
+  date_range = dateparser.find_date_range(desc, created, output.berlin)
+  if date_range is not None:
+    return date_range
+  else:
+    print("Warning: unknown period for charge --", charge.id, desc)
+    return created, created
+
+def createRevenueItems(charges):
+  revenue_items = []
+  for charge in charges:
+    cus = customer.retrieveCustomer(charge.customer)
+    session = getCheckoutSessionViaPaymentIntentCached(charge.payment_intent)
+
+    accounting_props = customer.getAccountingProps(customer.getCustomerDetails(cus), checkout_session=session)
+    if charge.receipt_number:
+      text = "Receipt {}".format(charge.receipt_number)
+    else:
+      text = "Charge {}".format(charge.id)
+
+    description = getChargeDescription(charge)
+    if description:
+      text += " / {}".format(description)
+
+    created = datetime.fromtimestamp(charge.created, timezone.utc)
+    start, end = getChargeRecognitionRange(charge)
+
+    charge_amount = decimal.Decimal(charge.amount) / 100
+    tax_amount = decimal.Decimal(session.total_details.amount_tax) / 100 if session else None
+    net_amount = charge_amount - tax_amount if tax_amount is not None else charge_amount
+
+    revenue_items.append({
+      "id": charge.id,
+      "number": charge.receipt_number,
+      "recognition_start": start,
+      "recognition_end": end,
+      "created": created,
+      "amount_net": net_amount,
+      "accounting_props": accounting_props,
+      "text": text,
+      "customer": cus,
+      "amount_with_tax": charge_amount,
+    })
+
+  return revenue_items
 
 def createAccountingRecords(charges):
   records = []
-  for charge in charges:
-    acc_props = customer.getAccountingProps(charge["customer"], checkout_session=charge.get("checkout_session", None))
 
-    text = "Stripe Payment ({})".format(charge["id"])
-    record = {
-      "date": charge["created"],
-      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(charge["amount"]),
+  for charge in charges:
+    acc_props = customer.getAccountingProps(None)
+    created = datetime.fromtimestamp(charge.created, timezone.utc)
+
+    balance_transaction = stripe.BalanceTransaction.retrieve(charge.balance_transaction)
+    assert len(balance_transaction.fee_details) == 1
+    assert balance_transaction.fee_details[0].currency == "eur"
+    fee_amount = decimal.Decimal(balance_transaction.fee_details[0].amount) / 100
+    fee_desc = balance_transaction.fee_details[0].description
+
+    records.append({
+      "date": created,
+      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(decimal.Decimal(charge.amount) / 100),
       "Soll/Haben-Kennzeichen": "S",
       "WKZ Umsatz": "EUR",
       "Konto": "1201",
       "Gegenkonto (ohne BU-Schlüssel)": acc_props["customer_account"],
-      # "BU-Schlüssel": "0",
-      # "Belegdatum": output.formatDateDatev(charge["created"]),
-      # "Belegfeld 1": charge["id"],
-      "Buchungstext": text,
+      "Buchungstext": "Stripe Payment ({})".format(charge.id),
+    })
 
-      # # "Beleginfo - Art 1": "Belegnummer",
-      # # "Beleginfo - Inhalt 1": invoice["invoice_number"],
-
-      # # "Beleginfo - Art 2": "Produkt",
-      # # "Beleginfo - Inhalt 2": lineItem["description"],
-
-      # "Beleginfo - Art 3": "Gegenpartei",
-      # "Beleginfo - Inhalt 3": invoice["customer"]["name"],
-
-      # "Beleginfo - Art 4": "Rechnungsnummer",
-      # "Beleginfo - Inhalt 4": invoice["invoice_number"],
-
-      "Beleginfo - Art 5": "Betrag",
-      "Beleginfo - Inhalt 5": output.formatDecimal(charge["amount"]),
-
-      # "Beleginfo - Art 6": "Umsatzsteuer",
-      # "Beleginfo - Inhalt 6": 0,
-
-      # "Beleginfo - Art 7": "Rechnungsdatum",
-      # "Beleginfo - Inhalt 7": output.formatDateHuman(invoice["date"]),
-
-      # "EU-Land u. UStID": invoice["customer"]["vat_id"],
-      # "EU-Steuersatz": invoice.get("tax_percent", ""),
-
-    }
-    records.append(record)
-
-    text = "{} ({})".format(charge["fee_desc"] or "Stripe Fee", charge["id"])
-    record = {
-      "date": charge["created"],
-      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(charge["fee_amount"]),
+    records.append({
+      "date": created,
+      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(fee_amount),
       "Soll/Haben-Kennzeichen": "S",
       "WKZ Umsatz": "EUR",
       "Konto": "70025",
       "Gegenkonto (ohne BU-Schlüssel)": "1201",
-      "Buchungstext": text,
-      "Beleginfo - Art 5": "Betrag",
-      "Beleginfo - Inhalt 5": output.formatDecimal(charge["fee_amount"]),
-    }
-    records.append(record)
-
-    if charge.get("no_invoice", False):
-      text = "Receipt {}".format(charge.get("receipt_number", charge["id"]))
-      # text = "{} (receipt no {} / {} - direct charge without invoice)".format(charge.get("description", "Stripe Charge"), charge.get("receipt_number", "n/a"), charge["id"])
-
-      record = {
-        "date": charge["created"],
-        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(charge["amount"]),
-        "Soll/Haben-Kennzeichen": "S",
-        "WKZ Umsatz": "EUR",
-        "Konto": acc_props["customer_account"],
-        "Gegenkonto (ohne BU-Schlüssel)": acc_props["revenue_account"],
-        "BU-Schlüssel": acc_props["datev_tax_key"],
-        "Buchungstext": text,
-      }
-      records.append(record)
+      "Buchungstext": "{} ({})".format(fee_desc or "Stripe Fee", charge.id),
+    })
 
   return records
 

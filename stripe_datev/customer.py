@@ -1,5 +1,38 @@
 import stripe
 
+customers_cached = {}
+
+def retrieveCustomer(id):
+  if isinstance(id, str):
+    if id in customers_cached:
+      return customers_cached[id]
+    cus = stripe.Customer.retrieve(id)
+    customers_cached[cus.id] = cus
+    return cus
+  elif isinstance(id, stripe.Customer):
+    customers_cached[id.id] = id
+    return id
+  else:
+    raise "Unexpected retrieveCustomer() argument: {}".format(id)
+
+def getCustomerName(customer):
+  if customer.get("deleted", False):
+    return customer.id
+  if customer.description is not None:
+    return customer.description
+  else:
+    return customer.name
+
+tax_ids_cached = {}
+
+def getCustomerTaxId(customer):
+  if customer.id in tax_ids_cached:
+    return tax_ids_cached[customer.id]
+  ids = stripe.Customer.list_tax_ids(customer.id, limit=10).data
+  tax_id = ids[0].value if len(ids) > 0 else None
+  tax_ids_cached[customer.id] = tax_id
+  return tax_id
+
 def getCustomerDetails(customer):
   record = {
     "id": customer.id
@@ -7,16 +40,14 @@ def getCustomerDetails(customer):
   if "deleted" in customer and customer.deleted:
     record["name"] = customer.id
   else:
-    if customer.description is not None:
-      record["name"] = customer.description
-    else:
-      record["name"] = customer.name
+    record["name"] = getCustomerName(customer)
     if customer.address is not None:
       record["country"] = customer.address.country
     elif customer.shipping is not None:
       record["country"] = customer.shipping.address.country
-    if customer.tax_info and customer.tax_info.type == "vat":
-      record["vat_id"] = customer.tax_info.tax_id
+    if record["country"] in country_codes_eu:
+      tax_id = getCustomerTaxId(customer)
+      record["vat_id"] = tax_id
     if customer.tax_exempt:
       record["tax_exempt"] = customer.tax_exempt
   return record
@@ -51,6 +82,13 @@ country_codes_eu = [
 ]
 
 def getAccountingProps(customer, invoice=None, checkout_session=None):
+  props = {
+    "customer_account": "10001",
+    "vat_region": "World",
+  }
+  if customer is None:
+    return props
+
   country = customer.get("country", None)
 
   invoice_tax = None
@@ -67,15 +105,13 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
 
   vat_id = customer.get("vat_id", None)
 
-  props = {
+  props = dict(props, **{
     "country": country,
     "vat_id": vat_id,
     "tax_exempt": tax_exempt,
     "invoice_tax": invoice_tax,
-    "customer_account": "10001",
-    "vat_region": "World",
     "datev_tax_key": "",
-  }
+  })
 
   if country == "DE":
     if invoice is not None and invoice_tax is None:

@@ -3,14 +3,15 @@ from stripe_datev import recognition, csv
 import pytz
 import stripe
 import decimal, math
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from . import customer, output, dateparser
 import datedelta
-import os, os.path
 
 accounting_tz = output.berlin
 
-def listFinalizedInvoices(fromTime, toTime, cache=True):
+invoices_cached = {}
+
+def listFinalizedInvoices(fromTime, toTime):
   starting_after = None
   invoices = []
   while True:
@@ -32,155 +33,141 @@ def listFinalizedInvoices(fromTime, toTime, cache=True):
     for invoice in response.data:
       if invoice.status == "draft" or invoice.status == "void":
         continue
-      created_date = datetime.fromtimestamp(invoice.created, timezone.utc)
-      due_date = datetime.fromtimestamp(invoice.due_date, timezone.utc)
-      finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc)
+      finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(accounting_tz)
       if finalized_date < fromTime or finalized_date >= toTime:
         # print("Skipping invoice {}, created {} finalized {} due {}".format(invoice.id, created_date, finalized_date, due_date))
         continue
       invoices.append(invoice)
+      invoices_cached[invoice.id] = invoice
 
     if not response.has_more:
       break
 
   return list(reversed(invoices))
 
-def listInvoices(fromTime, toTime):
-  invoiceRecords = []
-  for invoice in listFinalizedInvoices(fromTime, toTime):
-    record = {
-      "raw": invoice
-    }
+def retrieveInvoice(id):
+  if id in invoices_cached:
+    return invoices_cached[id]
+  invoice = stripe.Invoice.retrieve(id)
+  invoices_cached[invoice.id] = invoice
+  return invoice
 
-    if invoice.post_payment_credit_notes_amount == invoice.total:
-      if invoice.total > 0:
-        print("Warning: Invoice {} has been fully refunded, skipping".format(invoice.id))
-      continue
-    elif invoice.post_payment_credit_notes_amount > 0:
-      print("Warning: Invoice {} partially refunded - please check".format(invoice.id))
-    assert invoice.currency == "eur"
+def getLineItemRecognitionRange(line_item, invoice):
+  created = datetime.fromtimestamp(invoice.created, timezone.utc)
 
-    record["invoice_id"] = invoice.id
-    record["invoice_pdf"] = invoice.invoice_pdf
-    record["invoice_number"] = invoice.number
+  start = None
+  end = None
+  if "period" in line_item:
+    start = datetime.fromtimestamp(line_item["period"]["start"]).replace(tzinfo=pytz.utc)
+    end = datetime.fromtimestamp(line_item["period"]["end"]).replace(tzinfo=pytz.utc)
+  if start == end:
+    start = None
+    end = None
 
-    finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc)
-    record["date"] = finalized_date
-    record["total"] = decimal.Decimal(invoice.total) / 100
-    record["subtotal"] = decimal.Decimal(invoice.subtotal) / 100
-    if invoice.tax:
-      record["tax"] = decimal.Decimal(invoice.tax) / 100
-      record["tax_percent"] = decimal.Decimal(invoice.tax_percent)
-      record["total_before_tax"] = record["total"] - record["tax"]
-    else:
-      record["total_before_tax"] = record["total"]
+  # if start is None and end is None:
+  #   desc_parts = line_item.get("description", "").split(";")
+  #   if len(desc_parts) >= 3:
+  #     date_parts = desc_parts[-1].strip().split(" ")
+  #     start = accounting_tz.localize(datetime.strptime("{} {} {}".format(date_parts[1], date_parts[2][:-2], date_parts[3]), "%b %d %Y"))
+  #     end = start + timedelta(seconds=24 * 60 * 60 - 1)
 
-    record["customer_tax_exempt"] = invoice.customer_tax_exempt
-    record["charge_id"] = invoice.charge
+  if start is None and end is None:
+    try:
+      date_range = dateparser.find_date_range(line_item.get("description"), created, accounting_tz)
+      if date_range is not None:
+        start, end = date_range
 
-    lines = []
-    for line in invoice.lines:
-      # print(line)
-      amount = decimal.Decimal(line.amount) / 100
-      lineRecord = {
-        "amount": amount,
-        "amount_discounted": amount * record["total_before_tax"] / record["subtotal"],
-        "description": line.description,
-      }
-      if "period" in line:
-        lineRecord["period_start"] = datetime.fromtimestamp(line.period.start, timezone.utc)
-        lineRecord["period_end"] = datetime.fromtimestamp(line.period.end, timezone.utc)
-      lines.append(lineRecord)
-    record["lines"] = lines
+    except Exception as ex:
+      print(ex)
+      pass
 
-    record["customer"] = customer.getCustomerDetails(invoice.customer)
+  if start is None and end is None:
+    print("Warning: unknown period for line item --", invoice.id, line_item.get("description"))
+    start = created
+    end = created
 
-    invoiceRecords.append(record)
+  # else:
+  #   print("Period", start, end, "--", line_item.get("description"))
 
-  print("Retrieved {} invoice(s), total {} EUR".format(len(invoiceRecords), sum([r["total"] for r in invoiceRecords])))
-  return invoiceRecords
+  return start.astimezone(accounting_tz), end.astimezone(accounting_tz)
 
-def createAccountingRecords(invoices, fromTime, toTime):
+def createRevenueItems(invs):
+  revenue_items = []
+  for invoice in invs:
+    cus = customer.retrieveCustomer(invoice.customer)
+    accounting_props = customer.getAccountingProps(customer.getCustomerDetails(cus), invoice=invoice)
+    amount_with_tax = decimal.Decimal(invoice.total) / 100
+
+    finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(output.berlin)
+
+    invoice_discount = decimal.Decimal(((invoice.get("discount", None) or {}).get("coupon", None) or {}).get("percent_off", 0))
+
+    for line_item_idx, line_item in enumerate(invoice.lines):
+      text = "Invoice {} / {}".format(invoice.number, line_item.get("description", ""))
+      start, end = getLineItemRecognitionRange(line_item, invoice)
+
+      discounted_li_amount = decimal.Decimal(line_item["amount"]) / 100 * (1 - invoice_discount / 100)
+
+      revenue_items.append({
+        "id": invoice.id,
+        "number": invoice.number,
+        "line_item_idx": line_item_idx,
+        "recognition_start": start,
+        "recognition_end": end,
+        "created": finalized_date,
+        "amount_net": discounted_li_amount,
+        "accounting_props": accounting_props,
+        "text": text,
+        "customer": cus,
+        "amount_with_tax": amount_with_tax,
+      })
+
+  return revenue_items
+
+def createAccountingRecords(recognition_start, recognition_end, created, amount_net, accounting_props, text, amount_with_tax=None, customer=None, id=None, number=None, line_item_idx=None):
   records = []
-  nextMonth = toTime + timedelta(seconds=7200)
-  for invoice in invoices:
-    # print(invoice)
 
-    prefix = "Invoice {}".format(invoice["invoice_number"])
-    record = {
-      "date": invoice["date"],
-      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(invoice["total"]),
+  months = recognition.split_months(recognition_start, recognition_end, [amount_net])
+
+  base_months = list(filter(lambda month: month["start"] <= created, months))
+  base_amount = sum(map(lambda month: month["amounts"][0], base_months))
+
+  records.append({
+    "date": created,
+    "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(amount_with_tax or amount_net),
+    "Soll/Haben-Kennzeichen": "S",
+    "WKZ Umsatz": "EUR",
+    "Konto": accounting_props["customer_account"],
+    "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
+    "BU-Schlüssel": accounting_props["datev_tax_key"],
+    "Buchungstext": text,
+  })
+
+  forward_amount = amount_net - base_amount
+
+  forward_months = list(filter(lambda month: month["start"] > created, months))
+
+  if len(forward_months) > 0 and forward_amount > 0:
+    records.append({
+      "date": created,
+      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(forward_amount),
       "Soll/Haben-Kennzeichen": "S",
       "WKZ Umsatz": "EUR",
-      "Konto": customer.getCustomerAccount(invoice["customer"], invoice=invoice),
-      "Gegenkonto (ohne BU-Schlüssel)": customer.getRevenueAccount(invoice["customer"], invoice),
-      "BU-Schlüssel": customer.getDatevTaxKey(invoice["customer"], invoice),
-      # "Belegdatum": output.formatDateDatev(invoice["date"]),
-      # "Belegfeld 1": invoice["invoice_number"],
-      "Buchungstext": prefix,
+      "Konto": accounting_props["revenue_account"],
+      "Gegenkonto (ohne BU-Schlüssel)": "990",
+      "Buchungstext": "{} / pRAP nach {}".format(text, "{}..{}".format(forward_months[0]["start"].strftime("%Y-%m"), forward_months[-1]["start"].strftime("%Y-%m")) if len(forward_months) > 1 else forward_months[0]["start"].strftime("%Y-%m")),
+    })
 
-      # "Beleginfo - Art 1": "Belegnummer",
-      # "Beleginfo - Inhalt 1": invoice["invoice_number"],
-
-      # "Beleginfo - Art 2": "Produkt",
-      # "Beleginfo - Inhalt 2": lineItem["description"],
-
-      # "Beleginfo - Art 3": "Gegenpartei",
-      # "Beleginfo - Inhalt 3": invoice["customer"]["name"],
-
-      # "Beleginfo - Art 4": "Rechnungsnummer",
-      # "Beleginfo - Inhalt 4": invoice["invoice_number"],
-
-      # "Beleginfo - Art 5": "Betrag",
-      # "Beleginfo - Inhalt 5": output.formatDecimal(lineItem["amount"]),
-
-      # "Beleginfo - Art 6": "Umsatzsteuer",
-      # "Beleginfo - Inhalt 6": invoice.get("tax_percent", 0),
-
-      # "Beleginfo - Art 7": "Rechnungsdatum",
-      # "Beleginfo - Inhalt 7": output.formatDateHuman(invoice["date"]),
-
-      # "EU-Land u. UStID": invoice["customer"]["vat_id"],
-      # "EU-Steuersatz": invoice.get("tax_percent", ""),
-
-    }
-    records.append(record)
-
-    for lineItem in invoice["lines"]:
-      currentPeriodAmount = lineItem["amount_discounted"]
-      nextPeriodAmount = None
-      if "period_end" in lineItem and lineItem["period_end"] > toTime:
-        percentInCurrentPeriod = (toTime - lineItem["period_start"]) / (lineItem["period_end"] - lineItem["period_start"])
-        nextPeriodAmount = decimal.Decimal(float(currentPeriodAmount) * (1 - percentInCurrentPeriod) * 100).to_integral_exact() / 100
-
-      if nextPeriodAmount is not None:
-        text = "{} / Anteilig Rueckstellung".format(prefix, lineItem["description"])
-        rueckstRecord = {
-          "date": invoice["date"],
-          "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(nextPeriodAmount),
-          "Soll/Haben-Kennzeichen": "S",
-          "WKZ Umsatz": "EUR",
-          "Konto": customer.getRevenueAccount(invoice["customer"], invoice),
-          "Gegenkonto (ohne BU-Schlüssel)": "990",
-          # "Belegdatum": output.formatDateDatev(invoice["date"]),
-          # "Belegfeld 1": invoice["invoice_number"],
-          "Buchungstext": text,
-        }
-        records.append(rueckstRecord)
-
-        text = "{} / Aus Vormonat".format(prefix, lineItem["description"])
-        auflRecord = {
-          "date": nextMonth,
-          "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(nextPeriodAmount),
-          "Soll/Haben-Kennzeichen": "S",
-          "WKZ Umsatz": "EUR",
-          "Konto": "990",
-          "Gegenkonto (ohne BU-Schlüssel)": customer.getRevenueAccount(invoice["customer"], invoice),
-          # "Belegdatum": output.formatDateDatev(nextMonth),
-          # "Belegfeld 1": invoice["invoice_number"],
-          "Buchungstext": text,
-        }
-        records.append(auflRecord)
+    for month in forward_months:
+      records.append({
+        "date": month["start"],
+        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(month["amounts"][0]),
+        "Soll/Haben-Kennzeichen": "S",
+        "WKZ Umsatz": "EUR",
+        "Konto": "990",
+        "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
+        "Buchungstext": "{} / pRAP aus {}".format(text, created.strftime("%Y-%m")),
+      })
 
   return records
 
@@ -207,19 +194,27 @@ def to_csv(inv):
     "datev_tax_key",
   ]]
   for invoice in inv:
-    props = customer.getAccountingProps(invoice["customer"], invoice)
+    cus = customer.retrieveCustomer(invoice.customer)
+    props = customer.getAccountingProps(customer.getCustomerDetails(cus), invoice=invoice)
+
+    total = decimal.Decimal(invoice.total) / 100
+    tax = decimal.Decimal(invoice.tax) / 100 if invoice.tax else None
+    total_before_tax = total
+    if tax is not None:
+      total_before_tax -= tax
+
     lines.append([
-      invoice["invoice_id"],
-      invoice["invoice_number"],
-      invoice["date"].astimezone(output.berlin).strftime("%Y-%m-%d"),
+      invoice.id,
+      invoice.number,
+      datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(output.berlin).strftime("%Y-%m-%d"),
 
-      format(invoice["total_before_tax"], ".2f"),
-      format(invoice["tax"], ".2f") if "tax" in invoice else None,
-      format(invoice["tax_percent"], ".0f") if "tax_percent" in invoice else None,
-      format(invoice["total"], ".2f"),
+      format(total_before_tax, ".2f"),
+      format(tax, ".2f") if tax else None,
+      format(decimal.Decimal(invoice.tax_percent), ".0f") if "tax_percent" in invoice and invoice.tax_percent else None,
+      format(total, ".2f"),
 
-      invoice["customer"]["id"],
-      invoice["customer"]["name"],
+      cus.id,
+      customer.getCustomerName(cus),
       props["country"],
       props["vat_region"],
       props["vat_id"],
@@ -232,7 +227,7 @@ def to_csv(inv):
 
   return csv.lines_to_csv(lines)
 
-def to_recognized_month_csv(invoices):
+def to_recognized_month_csv2(revenue_items):
   lines = [[
     "invoice_id",
     "invoice_number",
@@ -251,79 +246,35 @@ def to_recognized_month_csv(invoices):
 
     "accounting_date",
   ]]
-  for inv2 in invoices:
-    inv = inv2["raw"]
 
-    props = customer.getAccountingProps(inv2["customer"], inv2)
+  for revenue_item in revenue_items:
+    for month in recognition.split_months(revenue_item["recognition_start"], revenue_item["recognition_end"], [revenue_item["amount_net"]]):
+      month_start = month["start"]
+      if month_start.year <= revenue_item["created"].year:
+        accounting_date = revenue_item["created"]
+      else:
+        accounting_date = datetime(month_start.year, 1, 1, tzinfo=output.berlin)
 
-    invoice_discount = decimal.Decimal(((inv.get("discount", None) or {}).get("coupon", None) or {}).get("percent_off", 0))
+      lines.append([
+        revenue_item["id"],
+        revenue_item.get("number", ""),
+        revenue_item["created"].strftime("%Y-%m-%d"),
+        revenue_item["recognition_start"].strftime("%Y-%m-%d"),
+        revenue_item["recognition_end"].strftime("%Y-%m-%d"),
+        month["start"].strftime("%Y-%m") + "-01",
 
-    created = accounting_tz.localize(datetime.fromtimestamp(inv["created"])) if "created" in inv else None
-    for line_item_idx, line_item in enumerate(reversed(inv.get("lines", {}).get("data", []))):
-      start = None
-      end = None
-      if "period" in line_item:
-        start = datetime.fromtimestamp(line_item["period"]["start"]).replace(tzinfo=pytz.utc)
-        end = datetime.fromtimestamp(line_item["period"]["end"]).replace(tzinfo=pytz.utc)
-      if start == end:
-        start = None
-        end = None
+        str(revenue_item.get("line_item_idx", 0) + 1),
+        revenue_item["text"],
+        format(month["amounts"][0], ".2f"),
 
-      # if start is None and end is None:
-      #   desc_parts = line_item.get("description", "").split(";")
-      #   if len(desc_parts) >= 3:
-      #     date_parts = desc_parts[-1].strip().split(" ")
-      #     start = accounting_tz.localize(datetime.strptime("{} {} {}".format(date_parts[1], date_parts[2][:-2], date_parts[3]), "%b %d %Y"))
-      #     end = start + timedelta(seconds=24 * 60 * 60 - 1)
+        revenue_item["customer"]["id"],
+        customer.getCustomerName(revenue_item["customer"]),
+        revenue_item["customer"].get("address", {}).get("country", ""),
 
-      if start is None and end is None:
-        try:
-          date_range = dateparser.find_date_range(line_item.get("description"), created, accounting_tz)
-          if date_range is not None:
-            start, end = date_range
-
-        except Exception as ex:
-          print(ex)
-          pass
-
-      if start is None and end is None:
-        print("Warning: unknown period for line item --", inv["id"], line_item.get("description"))
-        start = created
-        end = created
-
-      # else:
-      #   print("Period", start, end, "--", line_item.get("description"))
-
-      invoice_date = inv2["date"].astimezone(output.berlin)
-
-      for month in recognition.split_months(start, end, [decimal.Decimal(line_item["amount"]) / 100 * (1 - invoice_discount / 100)]):
-        month_start = month["start"]
-        if month_start.year <= invoice_date.year:
-          accounting_date = invoice_date
-        else:
-          accounting_date = datetime(month_start.year, 1, 1, tzinfo=output.berlin)
-
-        lines.append([
-          inv2["invoice_id"],
-          inv2["invoice_number"],
-          invoice_date.strftime("%Y-%m-%d"),
-          start.strftime("%Y-%m-%d"),
-          end.strftime("%Y-%m-%d"),
-          month["start"].strftime("%Y-%m") + "-01",
-
-          str(line_item_idx + 1),
-          line_item.get("description"),
-          format(month["amounts"][0], ".2f"),
-
-          inv2["customer"]["id"],
-          inv2["customer"]["name"],
-          props["country"],
-
-          accounting_date.strftime("%Y-%m-%d"),
-        ])
+        accounting_date.strftime("%Y-%m-%d"),
+      ])
 
   return csv.lines_to_csv(lines)
-
 
 def roundCentsDown(dec):
   return math.floor(dec * 100) / 100
