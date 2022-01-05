@@ -1,13 +1,10 @@
 import json
 from stripe_datev import recognition, csv
-import pytz
 import stripe
 import decimal, math
 from datetime import datetime, timezone
-from . import customer, output, dateparser
+from . import customer, output, dateparser, config
 import datedelta
-
-accounting_tz = output.berlin
 
 invoices_cached = {}
 
@@ -33,7 +30,7 @@ def listFinalizedInvoices(fromTime, toTime):
     for invoice in response.data:
       if invoice.status == "draft" or invoice.status == "void":
         continue
-      finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(accounting_tz)
+      finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(config.accounting_tz)
       if finalized_date < fromTime or finalized_date >= toTime:
         # print("Skipping invoice {}, created {} finalized {} due {}".format(invoice.id, created_date, finalized_date, due_date))
         continue
@@ -58,8 +55,8 @@ def getLineItemRecognitionRange(line_item, invoice):
   start = None
   end = None
   if "period" in line_item:
-    start = datetime.fromtimestamp(line_item["period"]["start"]).replace(tzinfo=pytz.utc)
-    end = datetime.fromtimestamp(line_item["period"]["end"]).replace(tzinfo=pytz.utc)
+    start = datetime.fromtimestamp(line_item["period"]["start"], timezone.utc)
+    end = datetime.fromtimestamp(line_item["period"]["end"], timezone.utc)
   if start == end:
     start = None
     end = None
@@ -73,7 +70,7 @@ def getLineItemRecognitionRange(line_item, invoice):
 
   if start is None and end is None:
     try:
-      date_range = dateparser.find_date_range(line_item.get("description"), created, accounting_tz)
+      date_range = dateparser.find_date_range(line_item.get("description"), created, tz=config.accounting_tz)
       if date_range is not None:
         start, end = date_range
 
@@ -89,7 +86,7 @@ def getLineItemRecognitionRange(line_item, invoice):
   # else:
   #   print("Period", start, end, "--", line_item.get("description"))
 
-  return start.astimezone(accounting_tz), end.astimezone(accounting_tz)
+  return start.astimezone(config.accounting_tz), end.astimezone(config.accounting_tz)
 
 def createRevenueItems(invs):
   revenue_items = []
@@ -98,7 +95,7 @@ def createRevenueItems(invs):
     accounting_props = customer.getAccountingProps(customer.getCustomerDetails(cus), invoice=invoice)
     amount_with_tax = decimal.Decimal(invoice.total) / 100
 
-    finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(output.berlin)
+    finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(config.accounting_tz)
 
     invoice_discount = decimal.Decimal(((invoice.get("discount", None) or {}).get("coupon", None) or {}).get("percent_off", 0))
 
@@ -206,7 +203,7 @@ def to_csv(inv):
     lines.append([
       invoice.id,
       invoice.number,
-      datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(output.berlin).strftime("%Y-%m-%d"),
+      datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(config.accounting_tz).strftime("%Y-%m-%d"),
 
       format(total_before_tax, ".2f"),
       format(tax, ".2f") if tax else None,
@@ -253,7 +250,7 @@ def to_recognized_month_csv2(revenue_items):
       if month_start.year <= revenue_item["created"].year:
         accounting_date = revenue_item["created"]
       else:
-        accounting_date = datetime(month_start.year, 1, 1, tzinfo=output.berlin)
+        accounting_date = datetime(month_start.year, 1, 1, tzinfo=config.accounting_tz)
 
       lines.append([
         revenue_item["id"],

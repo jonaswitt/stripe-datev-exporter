@@ -1,7 +1,7 @@
 import stripe
 import decimal
 from datetime import datetime, timezone
-from . import customer, output, dateparser
+from . import customer, dateparser, output, config
 
 def listChargesRaw(fromTime, toTime):
   starting_after = None
@@ -60,7 +60,7 @@ def getChargeDescription(charge):
 def getChargeRecognitionRange(charge):
   desc = getChargeDescription(charge)
   created = datetime.fromtimestamp(charge.created, timezone.utc)
-  date_range = dateparser.find_date_range(desc, created, output.berlin)
+  date_range = dateparser.find_date_range(desc, created, tz=config.accounting_tz)
   if date_range is not None:
     return date_range
   else:

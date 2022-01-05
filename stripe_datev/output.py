@@ -1,5 +1,5 @@
 from datetime import datetime
-import pytz
+from . import config
 
 fields = [
   "Umsatz (ohne Soll/Haben-Kz)",
@@ -125,8 +125,6 @@ fields = [
   "",
 ]
 
-berlin = pytz.timezone('Europe/Berlin')
-
 def filterRecords(records, fromTime=None, toTime=None):
   return list(filter(lambda r: (fromTime is None or r["date"] >= fromTime) and (toTime is None or r["date"] <= toTime), records))
 
@@ -142,7 +140,7 @@ def printRecords(textFileHandle, records, fromTime=None, toTime=None):
 
   minTime = fromTime or min([r["date"] for r in records])
   maxTime = toTime or max([r["date"] for r in records])
-  years = set(r["date"].astimezone(berlin).strftime("%Y") for r in records)
+  years = set(r["date"].astimezone(config.accounting_tz).strftime("%Y") for r in records)
   if len(years) > 1:
     raise Exception("May not print records from multiple years: {}".format(years))
 
@@ -152,17 +150,17 @@ def printRecords(textFileHandle, records, fromTime=None, toTime=None):
     '21', # Datenkategorie (21 = Buchungsstapel, 67 = Buchungstextkonstanten, 16 = Debitoren/Kreditoren, 20 = Kontenbeschriftungen usw.)
     'Buchungsstapel', # Formatname (Buchungsstapel, Buchungstextkonstanten, Debitoren/Kreditoren, Kontenbeschriftungen usw.)
     '9', # Formatversion (bezogen auf Formatname)
-    datetime.today().astimezone(berlin).strftime("%Y%m%d%H%M%S"), # '20190211202957107', # erzeugt am
+    datetime.today().astimezone(config.accounting_tz).strftime("%Y%m%d%H%M%S"), # '20190211202957107', # erzeugt am
     '', # importiert am
     'BH', # Herkunft
     '', # exportiert von
     '', # importiert von
     '1', # Beraternummer
     '1', # Mandantennummer
-    minTime.astimezone(berlin).strftime('%Y') + '0101', # Wirtschaftsjahresbeginn
+    minTime.astimezone(config.accounting_tz).strftime('%Y') + '0101', # Wirtschaftsjahresbeginn
     '4', # Sachkontenlänge
-    minTime.astimezone(berlin).strftime('%Y%m%d'), # Datum Beginn Buchungsstapel
-    maxTime.astimezone(berlin).strftime('%Y%m%d'), # Datum Ende Buchungsstapel
+    minTime.astimezone(config.accounting_tz).strftime('%Y%m%d'), # Datum Beginn Buchungsstapel
+    maxTime.astimezone(config.accounting_tz).strftime('%Y%m%d'), # Datum Ende Buchungsstapel
     '', # Bezeichnung (Vorlaufname, z. B. Buchungsstapel)
     '', # Diktatkürzel
     '1', # Buchungstyp (bei Buchungsstapel = 1)
@@ -186,10 +184,10 @@ def printRecords(textFileHandle, records, fromTime=None, toTime=None):
     textFileHandle.write("\n")
 
 def formatDateDatev(date):
-  return date.astimezone(berlin).strftime("%d%m")
+  return date.astimezone(config.accounting_tz).strftime("%d%m")
 
 def formatDateHuman(date):
-  return date.astimezone(berlin).strftime("%d.%m.%Y")
+  return date.astimezone(config.accounting_tz).strftime("%d.%m.%Y")
 
 def formatDecimal(d):
   return "{0:.2f}".format(d).replace(",", "").replace(".", ",")

@@ -3,10 +3,14 @@ import sys
 import argparse
 from datetime import datetime, timedelta, timezone
 import datedelta
-import pytz
 import stripe
-import stripe_datev.invoices, stripe_datev.charges, stripe_datev.customer, stripe_datev.recognition
-from stripe_datev import charges, payouts, output, customer
+import stripe_datev.invoices, \
+  stripe_datev.charges, \
+  stripe_datev.customer, \
+  stripe_datev.payouts, \
+  stripe_datev.recognition, \
+  stripe_datev.output, \
+  stripe_datev.config
 import os, os.path
 import requests
 import dotenv
@@ -43,15 +47,14 @@ class StripeDatevCli(object):
         year = int(args.year)
         month = int(args.month)
 
-        berlin = pytz.timezone('Europe/Berlin')
         if month > 0:
-          fromTime = berlin.localize(datetime(year, month, 1, 0, 0, 0, 0))
+          fromTime = stripe_datev.config.accounting_tz.localize(datetime(year, month, 1, 0, 0, 0, 0))
           toTime = fromTime + datedelta.MONTH
         else:
-          fromTime = berlin.localize(datetime(year, 1, 1, 0, 0, 0, 0))
+          fromTime = stripe_datev.config.accounting_tz.localize(datetime(year, 1, 1, 0, 0, 0, 0))
           toTime = fromTime + datedelta.YEAR
         print("Retrieving data between {} and {}".format(fromTime.strftime("%Y-%m-%d"), (toTime - timedelta(0, 1)).strftime("%Y-%m-%d")))
-        thisMonth = fromTime.astimezone(output.berlin).strftime("%Y-%m")
+        thisMonth = fromTime.astimezone(stripe_datev.config.accounting_tz).strftime("%Y-%m")
 
         invoices = stripe_datev.invoices.listFinalizedInvoices(fromTime, toTime)
         print("Retrieved {} invoice(s), total {} EUR".format(len(invoices), sum([decimal.Decimal(i.total) / 100 for i in invoices])))
@@ -98,18 +101,18 @@ class StripeDatevCli(object):
             name = "EXTF_{}_Revenue.csv".format(thisMonth)
           else:
             name = "EXTF_{}_Revenue_From_{}.csv".format(month, thisMonth)
-          output.writeRecords(os.path.join(datevDir, name), records)
+          stripe_datev.output.writeRecords(os.path.join(datevDir, name), records)
 
         # Datev charges
 
         charge_records = stripe_datev.charges.createAccountingRecords(charges)
-        output.writeRecords(os.path.join(datevDir, "EXTF_{}_Charges.csv".format(thisMonth)), charge_records)
+        stripe_datev.output.writeRecords(os.path.join(datevDir, "EXTF_{}_Charges.csv".format(thisMonth)), charge_records)
 
         # Datev payouts
 
-        payoutObjects = payouts.listPayouts(fromTime, toTime)
-        payout_records = payouts.createAccountingRecords(payoutObjects)
-        output.writeRecords(os.path.join(datevDir, "EXTF_{}_Payouts.csv".format(thisMonth)), payout_records)
+        payoutObjects = stripe_datev.payouts.listPayouts(fromTime, toTime)
+        payout_records = stripe_datev.payouts.createAccountingRecords(payoutObjects)
+        stripe_datev.output.writeRecords(os.path.join(datevDir, "EXTF_{}_Payouts.csv".format(thisMonth)), payout_records)
 
         # PDF
 
@@ -119,7 +122,7 @@ class StripeDatevCli(object):
 
         for invoice in invoices:
           pdfLink = invoice.invoice_pdf
-          finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(berlin)
+          finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(stripe_datev.config.accounting_tz)
           invNo = invoice.number
 
           fileName = "{} {}.pdf".format(finalized_date.strftime("%Y-%m-%d"), invNo)
@@ -170,10 +173,10 @@ class StripeDatevCli(object):
       if not os.path.exists(datevDir):
         os.mkdir(datevDir)
       with open(os.path.join(datevDir, "EXTF_accrual.csv"), 'w', encoding="latin1", errors="replace", newline="\r\n") as fp:
-          output.printRecords(fp, records, fromTime, toTime)
+          stripe_datev.output.printRecords(fp, records, fromTime, toTime)
 
     def run_validate_customers(self):
-      customer.validate_customers()
+      stripe_datev.customer.validate_customers()
 
 if __name__ == '__main__':
     StripeDatevCli(sys.argv).run()
