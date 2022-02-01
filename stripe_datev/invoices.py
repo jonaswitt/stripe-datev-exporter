@@ -28,7 +28,10 @@ def listFinalizedInvoices(fromTime, toTime):
       break
     starting_after = response.data[-1].id
     for invoice in response.data:
-      if invoice.status == "draft" or invoice.status == "void":
+      if invoice.status == "draft":
+        continue
+      if invoice.status == "void":
+        print("Voided invoice, skipping:", invoice.id)
         continue
       finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(config.accounting_tz)
       if finalized_date < fromTime or finalized_date >= toTime:
