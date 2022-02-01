@@ -91,6 +91,13 @@ def getLineItemRecognitionRange(line_item, invoice):
 def createRevenueItems(invs):
   revenue_items = []
   for invoice in invs:
+    if invoice.post_payment_credit_notes_amount > 0:
+      if invoice.post_payment_credit_notes_amount == invoice.total:
+        print("Fully credited invoice, skipping:", invoice.id)
+        continue
+      else:
+        raise NotImplementedError("Handling of partially credited invoices is not implemented yet")
+
     cus = customer.retrieveCustomer(invoice.customer)
     accounting_props = customer.getAccountingProps(customer.getCustomerDetails(cus), invoice=invoice)
     amount_with_tax = decimal.Decimal(invoice.total) / 100
