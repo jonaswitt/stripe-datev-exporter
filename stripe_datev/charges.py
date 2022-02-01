@@ -22,8 +22,6 @@ def listChargesRaw(fromTime, toTime):
     for charge in response.data:
       if not charge.paid or not charge.captured:
         continue
-      if charge.refunded:
-        continue
 
       charges.append(charge)
 
@@ -70,6 +68,13 @@ def getChargeRecognitionRange(charge):
 def createRevenueItems(charges):
   revenue_items = []
   for charge in charges:
+    if charge.refunded:
+      if charge.refunds.data[0].amount == charge.amount:
+        print("Skipping fully refunded charge", charge.id)
+        continue
+      else:
+        raise NotImplementedError("Handling of partially refunded charges is not implemented yet")
+
     cus = customer.retrieveCustomer(charge.customer)
     session = getCheckoutSessionViaPaymentIntentCached(charge.payment_intent)
 
@@ -137,6 +142,21 @@ def createAccountingRecords(charges):
       "Gegenkonto (ohne BU-Schlüssel)": "1201",
       "Buchungstext": "{} ({})".format(fee_desc or "Stripe Fee", charge.id),
     })
+
+    if charge.refunded or len(charge.refunds.data) > 0:
+      assert len(charge.refunds.data) == 1
+      refund = charge.refunds.data[0]
+
+      refund_created = datetime.fromtimestamp(refund.created, timezone.utc)
+      records.append({
+        "date": refund_created,
+        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(decimal.Decimal(refund.amount) / 100),
+        "Soll/Haben-Kennzeichen": "S",
+        "WKZ Umsatz": "EUR",
+        "Konto": acc_props["customer_account"],
+        "Gegenkonto (ohne BU-Schlüssel)": "1201",
+        "Buchungstext": "Stripe Payment Refund ({})".format(charge.id),
+      })
 
   return records
 
