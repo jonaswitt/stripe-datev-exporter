@@ -21,7 +21,6 @@ def listFinalizedInvoices(fromTime, toTime):
         "gte": int(fromTime.timestamp()),
       },
       limit=50,
-      expand=["data.customer"],
     )
     # print("Fetched {} invoices".format(len(response.data)))
     if len(response.data) == 0:
@@ -116,7 +115,12 @@ def createRevenueItems(invs):
 
     invoice_discount = decimal.Decimal(((invoice.get("discount", None) or {}).get("coupon", None) or {}).get("percent_off", 0))
 
-    for line_item_idx, line_item in enumerate(invoice.lines):
+    if invoice.lines.has_more:
+      lines = invoice.lines.list().auto_paging_iter()
+    else:
+      lines = invoice.lines
+
+    for line_item_idx, line_item in enumerate(lines):
       text = "Invoice {} / {}".format(invoice.number, line_item.get("description", ""))
       start, end = getLineItemRecognitionRange(line_item, invoice)
 
