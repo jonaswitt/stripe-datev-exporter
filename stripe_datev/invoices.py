@@ -161,7 +161,6 @@ def createRevenueItems(invs):
 
 def createAccountingRecords(revenue_item):
   created = revenue_item["created"]
-  amount_net = revenue_item["amount_net"]
   amount_with_tax = revenue_item["amount_with_tax"]
   accounting_props = revenue_item["accounting_props"]
   line_items = revenue_item["line_items"]
@@ -172,7 +171,7 @@ def createAccountingRecords(revenue_item):
 
   records.append({
     "date": created,
-    "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(amount_with_tax or amount_net),
+    "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(amount_with_tax),
     "Soll/Haben-Kennzeichen": "S",
     "WKZ Umsatz": "EUR",
     "Konto": accounting_props["customer_account"],
@@ -185,7 +184,7 @@ def createAccountingRecords(revenue_item):
     print("Voided/refunded", text, "Created", created, 'Voided', voided_at)
     records.append({
       "date": voided_at,
-      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(amount_with_tax or amount_net),
+      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(amount_with_tax),
       "Soll/Haben-Kennzeichen": "S",
       "WKZ Umsatz": "EUR",
       "Konto": accounting_props["revenue_account"],
@@ -195,18 +194,17 @@ def createAccountingRecords(revenue_item):
     })
 
   for line_item in line_items:
-    amount_net = line_item["amount_net"]
     amount_with_tax = line_item["amount_with_tax"]
     recognition_start = line_item["recognition_start"]
     recognition_end = line_item["recognition_end"]
     text = line_item["text"]
 
-    months = recognition.split_months(recognition_start, recognition_end, [amount_with_tax or amount_net])
+    months = recognition.split_months(recognition_start, recognition_end, [amount_with_tax])
 
     base_months = list(filter(lambda month: month["start"] <= created, months))
     base_amount = sum(map(lambda month: month["amounts"][0], base_months))
 
-    forward_amount = amount_net - base_amount
+    forward_amount = amount_with_tax - base_amount
 
     forward_months = list(filter(lambda month: month["start"] > created, months))
 
