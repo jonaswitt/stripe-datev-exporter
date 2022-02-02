@@ -311,11 +311,7 @@ def to_recognized_month_csv2(revenue_items):
   for revenue_item in revenue_items:
     for line_item in revenue_item["line_items"]:
       for month in recognition.split_months(line_item["recognition_start"], line_item["recognition_end"], [line_item["amount_net"]]):
-        month_start = month["start"]
-        if month_start.year <= revenue_item["created"].year:
-          accounting_date = revenue_item["created"]
-        else:
-          accounting_date = datetime(month_start.year, 1, 1, tzinfo=config.accounting_tz)
+        accounting_date = max(revenue_item["created"], month["start"])
 
         lines.append([
           revenue_item["id"],
