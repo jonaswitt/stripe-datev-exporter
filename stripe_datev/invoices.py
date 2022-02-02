@@ -101,9 +101,14 @@ def createRevenueItems(invs):
       else:
         raise NotImplementedError("Handling of partially credited invoices is not implemented yet")
 
+    line_items = []
+
     cus = customer.retrieveCustomer(invoice.customer)
     accounting_props = customer.getAccountingProps(customer.getCustomerDetails(cus), invoice=invoice)
     amount_with_tax = decimal.Decimal(invoice.total) / 100
+    amount_net = amount_with_tax
+    if invoice.tax:
+      amount_net -= decimal.Decimal(invoice.tax) / 100
 
     finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(config.accounting_tz)
 
@@ -124,29 +129,38 @@ def createRevenueItems(invs):
         else:
           discounted_li_net -= li_tax
 
-      revenue_items.append({
-        "id": invoice.id,
-        "number": invoice.number,
+      line_items.append({
         "line_item_idx": line_item_idx,
         "recognition_start": start,
         "recognition_end": end,
-        "created": finalized_date,
         "amount_net": discounted_li_net,
-        "accounting_props": accounting_props,
         "text": text,
-        "customer": cus,
         "amount_with_tax": discounted_li_total
       })
 
+    revenue_items.append({
+      "id": invoice.id,
+      "number": invoice.number,
+      "created": finalized_date,
+      "amount_net": amount_net,
+      "accounting_props": accounting_props,
+      "customer": cus,
+      "amount_with_tax": amount_with_tax,
+      "text": "Invoice {}".format(invoice.number),
+      "line_items": line_items
+    })
+
   return revenue_items
 
-def createAccountingRecords(recognition_start, recognition_end, created, amount_net, accounting_props, text, amount_with_tax=None, customer=None, id=None, number=None, line_item_idx=None):
+def createAccountingRecords(revenue_item):
+  created = revenue_item["created"]
+  amount_net = revenue_item["amount_net"]
+  amount_with_tax = revenue_item["amount_with_tax"]
+  accounting_props = revenue_item["accounting_props"]
+  line_items = revenue_item["line_items"]
+  text = revenue_item["text"]
+
   records = []
-
-  months = recognition.split_months(recognition_start, recognition_end, [amount_with_tax or amount_net])
-
-  base_months = list(filter(lambda month: month["start"] <= created, months))
-  base_amount = sum(map(lambda month: month["amounts"][0], base_months))
 
   records.append({
     "date": created,
@@ -159,31 +173,43 @@ def createAccountingRecords(recognition_start, recognition_end, created, amount_
     "Buchungstext": text,
   })
 
-  forward_amount = amount_net - base_amount
+  for line_item in line_items:
+    amount_net = line_item["amount_net"]
+    amount_with_tax = line_item["amount_with_tax"]
+    recognition_start = line_item["recognition_start"]
+    recognition_end = line_item["recognition_end"]
+    text = line_item["text"]
 
-  forward_months = list(filter(lambda month: month["start"] > created, months))
+    months = recognition.split_months(recognition_start, recognition_end, [amount_with_tax or amount_net])
 
-  if len(forward_months) > 0 and forward_amount > 0:
-    records.append({
-      "date": created,
-      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(forward_amount),
-      "Soll/Haben-Kennzeichen": "S",
-      "WKZ Umsatz": "EUR",
-      "Konto": accounting_props["revenue_account"],
-      "Gegenkonto (ohne BU-Schlüssel)": "990",
-      "Buchungstext": "{} / pRAP nach {}".format(text, "{}..{}".format(forward_months[0]["start"].strftime("%Y-%m"), forward_months[-1]["start"].strftime("%Y-%m")) if len(forward_months) > 1 else forward_months[0]["start"].strftime("%Y-%m")),
-    })
+    base_months = list(filter(lambda month: month["start"] <= created, months))
+    base_amount = sum(map(lambda month: month["amounts"][0], base_months))
 
-    for month in forward_months:
+    forward_amount = amount_net - base_amount
+
+    forward_months = list(filter(lambda month: month["start"] > created, months))
+
+    if len(forward_months) > 0 and forward_amount > 0:
       records.append({
-        "date": month["start"],
-        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(month["amounts"][0]),
+        "date": created,
+        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(forward_amount),
         "Soll/Haben-Kennzeichen": "S",
         "WKZ Umsatz": "EUR",
-        "Konto": "990",
-        "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
-        "Buchungstext": "{} / pRAP aus {}".format(text, created.strftime("%Y-%m")),
+        "Konto": accounting_props["revenue_account"],
+        "Gegenkonto (ohne BU-Schlüssel)": "990",
+        "Buchungstext": "{} / pRAP nach {}".format(text, "{}..{}".format(forward_months[0]["start"].strftime("%Y-%m"), forward_months[-1]["start"].strftime("%Y-%m")) if len(forward_months) > 1 else forward_months[0]["start"].strftime("%Y-%m")),
       })
+
+      for month in forward_months:
+        records.append({
+          "date": month["start"],
+          "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(month["amounts"][0]),
+          "Soll/Haben-Kennzeichen": "S",
+          "WKZ Umsatz": "EUR",
+          "Konto": "990",
+          "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
+          "Buchungstext": "{} / pRAP aus {}".format(text, created.strftime("%Y-%m")),
+        })
 
   return records
 
@@ -264,31 +290,32 @@ def to_recognized_month_csv2(revenue_items):
   ]]
 
   for revenue_item in revenue_items:
-    for month in recognition.split_months(revenue_item["recognition_start"], revenue_item["recognition_end"], [revenue_item["amount_net"]]):
-      month_start = month["start"]
-      if month_start.year <= revenue_item["created"].year:
-        accounting_date = revenue_item["created"]
-      else:
-        accounting_date = datetime(month_start.year, 1, 1, tzinfo=config.accounting_tz)
+    for line_item in revenue_item["line_items"]:
+      for month in recognition.split_months(line_item["recognition_start"], line_item["recognition_end"], [line_item["amount_net"]]):
+        month_start = month["start"]
+        if month_start.year <= revenue_item["created"].year:
+          accounting_date = revenue_item["created"]
+        else:
+          accounting_date = datetime(month_start.year, 1, 1, tzinfo=config.accounting_tz)
 
-      lines.append([
-        revenue_item["id"],
-        revenue_item.get("number", ""),
-        revenue_item["created"].strftime("%Y-%m-%d"),
-        revenue_item["recognition_start"].strftime("%Y-%m-%d"),
-        revenue_item["recognition_end"].strftime("%Y-%m-%d"),
-        month["start"].strftime("%Y-%m") + "-01",
+        lines.append([
+          revenue_item["id"],
+          revenue_item.get("number", ""),
+          revenue_item["created"].strftime("%Y-%m-%d"),
+          line_item["recognition_start"].strftime("%Y-%m-%d"),
+          line_item["recognition_end"].strftime("%Y-%m-%d"),
+          month["start"].strftime("%Y-%m") + "-01",
 
-        str(revenue_item.get("line_item_idx", 0) + 1),
-        revenue_item["text"],
-        format(month["amounts"][0], ".2f"),
+          str(line_item.get("line_item_idx", 0) + 1),
+          line_item["text"],
+          format(month["amounts"][0], ".2f"),
 
-        revenue_item["customer"]["id"],
-        customer.getCustomerName(revenue_item["customer"]),
-        revenue_item["customer"].get("address", {}).get("country", ""),
+          revenue_item["customer"]["id"],
+          customer.getCustomerName(revenue_item["customer"]),
+          revenue_item["customer"].get("address", {}).get("country", ""),
 
-        accounting_date.strftime("%Y-%m-%d"),
-      ])
+          accounting_date.strftime("%Y-%m-%d"),
+        ])
 
   return csv.lines_to_csv(lines)
 

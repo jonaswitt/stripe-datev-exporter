@@ -89,7 +89,7 @@ class StripeDatevCli(object):
 
         records = []
         for revenue_item in revenue_items:
-          records += stripe_datev.invoices.createAccountingRecords(**revenue_item)
+          records += stripe_datev.invoices.createAccountingRecords(revenue_item)
 
         records_by_month = {}
         for record in records:

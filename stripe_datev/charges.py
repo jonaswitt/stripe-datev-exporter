@@ -98,14 +98,18 @@ def createRevenueItems(charges):
     revenue_items.append({
       "id": charge.id,
       "number": charge.receipt_number,
-      "recognition_start": start,
-      "recognition_end": end,
       "created": created,
       "amount_net": net_amount,
       "accounting_props": accounting_props,
-      "text": text,
       "customer": cus,
       "amount_with_tax": charge_amount,
+      "line_items": [{
+        "recognition_start": start,
+        "recognition_end": end,
+        "amount_net": net_amount,
+        "text": text,
+        "amount_with_tax": charge_amount
+      }]
     })
 
   return revenue_items
