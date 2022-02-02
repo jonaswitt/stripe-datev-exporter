@@ -138,7 +138,7 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
     if country in country_codes_eu and vat_id is None:
       print("Warning: EU reverse charge customer without VAT ID", customer["id"])
 
-    if country in country_codes_eu and vat_id is None:
+    if country in country_codes_eu and vat_id is not None:
       props["revenue_account"] = "8336"
     else:
       props["revenue_account"] = "8338"
