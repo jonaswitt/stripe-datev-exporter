@@ -30,9 +30,6 @@ def listFinalizedInvoices(fromTime, toTime):
     for invoice in response.data:
       if invoice.status == "draft":
         continue
-      if invoice.status == "void":
-        print("Voided invoice, skipping:", invoice.id)
-        continue
       finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(config.accounting_tz)
       if finalized_date < fromTime or finalized_date >= toTime:
         # print("Skipping invoice {}, created {} finalized {} due {}".format(invoice.id, created_date, finalized_date, due_date))
@@ -94,10 +91,15 @@ def getLineItemRecognitionRange(line_item, invoice):
 def createRevenueItems(invs):
   revenue_items = []
   for invoice in invs:
+    voided_at = None
+    if invoice.status == "void":
+      voided_at = datetime.fromtimestamp(invoice.status_transitions.voided_at, timezone.utc).astimezone(config.accounting_tz)
+
     if invoice.post_payment_credit_notes_amount > 0:
+      cns = stripe.CreditNote.list(invoice=invoice.id).data
+      assert len(cns) == 1
       if invoice.post_payment_credit_notes_amount == invoice.total:
-        print("Fully credited invoice, skipping:", invoice.id)
-        continue
+        voided_at = datetime.fromtimestamp(cns[0].created, timezone.utc).astimezone(config.accounting_tz)
       else:
         raise NotImplementedError("Handling of partially credited invoices is not implemented yet")
 
@@ -147,7 +149,8 @@ def createRevenueItems(invs):
       "customer": cus,
       "amount_with_tax": amount_with_tax,
       "text": "Invoice {}".format(invoice.number),
-      "line_items": line_items
+      "voided_at": voided_at,
+      "line_items": line_items if voided_at is None else [],
     })
 
   return revenue_items
@@ -159,6 +162,7 @@ def createAccountingRecords(revenue_item):
   accounting_props = revenue_item["accounting_props"]
   line_items = revenue_item["line_items"]
   text = revenue_item["text"]
+  voided_at = revenue_item.get("voided_at", None)
 
   records = []
 
@@ -172,6 +176,19 @@ def createAccountingRecords(revenue_item):
     "BU-Schlüssel": accounting_props["datev_tax_key"],
     "Buchungstext": text,
   })
+
+  if voided_at is not None:
+    print("Voided/refunded", text, "Created", created, 'Voided', voided_at)
+    records.append({
+      "date": voided_at,
+      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(amount_with_tax or amount_net),
+      "Soll/Haben-Kennzeichen": "S",
+      "WKZ Umsatz": "EUR",
+      "Konto": accounting_props["revenue_account"],
+      "Gegenkonto (ohne BU-Schlüssel)": accounting_props["customer_account"],
+      "BU-Schlüssel": accounting_props["datev_tax_key"],
+      "Buchungstext": "Storno {}".format(text),
+    })
 
   for line_item in line_items:
     amount_net = line_item["amount_net"]
