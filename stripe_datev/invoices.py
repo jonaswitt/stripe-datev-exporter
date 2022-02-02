@@ -255,6 +255,8 @@ def to_csv(inv):
     "datev_tax_key",
   ]]
   for invoice in inv:
+    if invoice.status == "void":
+      continue
     cus = customer.retrieveCustomer(invoice.customer)
     props = customer.getAccountingProps(customer.getCustomerDetails(cus), invoice=invoice)
 
@@ -309,6 +311,10 @@ def to_recognized_month_csv2(revenue_items):
   ]]
 
   for revenue_item in revenue_items:
+    voided_at = revenue_item.get("voided_at", None)
+    if voided_at is not None:
+      continue
+
     for line_item in revenue_item["line_items"]:
       for month in recognition.split_months(line_item["recognition_start"], line_item["recognition_end"], [line_item["amount_net"]]):
         accounting_date = max(revenue_item["created"], month["start"])
