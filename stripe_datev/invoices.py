@@ -113,7 +113,16 @@ def createRevenueItems(invs):
       text = "Invoice {} / {}".format(invoice.number, line_item.get("description", ""))
       start, end = getLineItemRecognitionRange(line_item, invoice)
 
-      discounted_li_amount = decimal.Decimal(line_item["amount"]) / 100 * (1 - invoice_discount / 100)
+      li_amount = decimal.Decimal(line_item["amount"]) / 100
+      discounted_li_net = li_amount * (1 - invoice_discount / 100)
+      discounted_li_total = discounted_li_net
+      if len(line_item["tax_amounts"]) > 0:
+        assert len(line_item["tax_amounts"]) == 1
+        li_tax = decimal.Decimal(line_item["tax_amounts"][0]["amount"]) / 100
+        if not line_item["tax_amounts"][0]["inclusive"]:
+          discounted_li_total += li_tax
+        else:
+          discounted_li_net -= li_tax
 
       revenue_items.append({
         "id": invoice.id,
@@ -122,11 +131,11 @@ def createRevenueItems(invs):
         "recognition_start": start,
         "recognition_end": end,
         "created": finalized_date,
-        "amount_net": discounted_li_amount,
+        "amount_net": discounted_li_net,
         "accounting_props": accounting_props,
         "text": text,
         "customer": cus,
-        "amount_with_tax": amount_with_tax,
+        "amount_with_tax": discounted_li_total
       })
 
   return revenue_items
@@ -134,7 +143,7 @@ def createRevenueItems(invs):
 def createAccountingRecords(recognition_start, recognition_end, created, amount_net, accounting_props, text, amount_with_tax=None, customer=None, id=None, number=None, line_item_idx=None):
   records = []
 
-  months = recognition.split_months(recognition_start, recognition_end, [amount_net])
+  months = recognition.split_months(recognition_start, recognition_end, [amount_with_tax or amount_net])
 
   base_months = list(filter(lambda month: month["start"] <= created, months))
   base_amount = sum(map(lambda month: month["amounts"][0], base_months))
