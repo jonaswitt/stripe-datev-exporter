@@ -94,13 +94,15 @@ def createRevenueItems(invs):
     if invoice.status == "void":
       voided_at = datetime.fromtimestamp(invoice.status_transitions.voided_at, timezone.utc).astimezone(config.accounting_tz)
 
+    credited_at = None
+    credited_amount = None
+    invoice_discount_factor = 1
     if invoice.post_payment_credit_notes_amount > 0:
       cns = stripe.CreditNote.list(invoice=invoice.id).data
       assert len(cns) == 1
-      if invoice.post_payment_credit_notes_amount == invoice.total:
-        voided_at = datetime.fromtimestamp(cns[0].created, timezone.utc).astimezone(config.accounting_tz)
-      else:
-        raise NotImplementedError("Handling of partially credited invoices is not implemented yet")
+      credited_at = datetime.fromtimestamp(cns[0].created, timezone.utc).astimezone(config.accounting_tz)
+      credited_amount = decimal.Decimal(invoice.post_payment_credit_notes_amount) / 100
+      invoice_discount_factor = 1 - (decimal.Decimal(invoice.post_payment_credit_notes_amount) / decimal.Decimal(invoice.total))
 
     line_items = []
 
@@ -110,10 +112,13 @@ def createRevenueItems(invs):
     amount_net = amount_with_tax
     if invoice.tax:
       amount_net -= decimal.Decimal(invoice.tax) / 100
+    amount_with_tax *= invoice_discount_factor
+    amount_net *= invoice_discount_factor
 
     finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(config.accounting_tz)
 
     invoice_discount = decimal.Decimal(((invoice.get("discount", None) or {}).get("coupon", None) or {}).get("percent_off", 0))
+    line_item_discount_factor = (1 - invoice_discount / 100)
 
     if invoice.lines.has_more:
       lines = invoice.lines.list().auto_paging_iter()
@@ -125,7 +130,7 @@ def createRevenueItems(invs):
       start, end = getLineItemRecognitionRange(line_item, invoice)
 
       li_amount = decimal.Decimal(line_item["amount"]) / 100
-      discounted_li_net = li_amount * (1 - invoice_discount / 100)
+      discounted_li_net = li_amount * line_item_discount_factor
       discounted_li_total = discounted_li_net
       if len(line_item["tax_amounts"]) > 0:
         assert len(line_item["tax_amounts"]) == 1
@@ -139,9 +144,9 @@ def createRevenueItems(invs):
         "line_item_idx": line_item_idx,
         "recognition_start": start,
         "recognition_end": end,
-        "amount_net": discounted_li_net,
+        "amount_net": discounted_li_net * invoice_discount_factor,
         "text": text,
-        "amount_with_tax": discounted_li_total
+        "amount_with_tax": discounted_li_total * invoice_discount_factor
       })
 
     revenue_items.append({
@@ -154,6 +159,8 @@ def createRevenueItems(invs):
       "amount_with_tax": amount_with_tax,
       "text": "Invoice {}".format(invoice.number),
       "voided_at": voided_at,
+      "credited_at": credited_at,
+      "credited_amount": credited_amount,
       "line_items": line_items if voided_at is None else [],
     })
 
@@ -166,6 +173,8 @@ def createAccountingRecords(revenue_item):
   line_items = revenue_item["line_items"]
   text = revenue_item["text"]
   voided_at = revenue_item.get("voided_at", None)
+  credited_at = revenue_item.get("credited_at", None)
+  credited_amount = revenue_item.get("credited_amount", None)
 
   records = []
 
@@ -181,7 +190,7 @@ def createAccountingRecords(revenue_item):
   })
 
   if voided_at is not None:
-    print("Voided/refunded", text, "Created", created, 'Voided', voided_at)
+    print("Voided", text, "Created", created, 'Voided', voided_at)
     records.append({
       "date": voided_at,
       "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(amount_with_tax),
@@ -191,6 +200,19 @@ def createAccountingRecords(revenue_item):
       "Gegenkonto (ohne BU-Schlüssel)": accounting_props["customer_account"],
       "BU-Schlüssel": accounting_props["datev_tax_key"],
       "Buchungstext": "Storno {}".format(text),
+    })
+
+  if credited_at is not None:
+    print("Refunded", text, "Created", created, 'Refunded', credited_at)
+    records.append({
+      "date": credited_at,
+      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(credited_amount),
+      "Soll/Haben-Kennzeichen": "S",
+      "WKZ Umsatz": "EUR",
+      "Konto": accounting_props["revenue_account"],
+      "Gegenkonto (ohne BU-Schlüssel)": accounting_props["customer_account"],
+      "BU-Schlüssel": accounting_props["datev_tax_key"],
+      "Buchungstext": "Erstattung {}".format(text),
     })
 
   for line_item in line_items:
