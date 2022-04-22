@@ -191,6 +191,7 @@ def createAccountingRecords(revenue_item):
   credited_at = revenue_item.get("credited_at", None)
   credited_amount = revenue_item.get("credited_amount", None)
   number = revenue_item["number"]
+  eu_vat_id = accounting_props["vat_id"] or ""
 
   records = []
 
@@ -204,6 +205,7 @@ def createAccountingRecords(revenue_item):
     "BU-Schlüssel": accounting_props["datev_tax_key"],
     "Buchungstext": text,
     "Belegfeld 1": number,
+    "EU-Land u. UStID": eu_vat_id,
   })
 
   if voided_at is not None:
@@ -218,6 +220,7 @@ def createAccountingRecords(revenue_item):
       "BU-Schlüssel": accounting_props["datev_tax_key"],
       "Buchungstext": "Storno {}".format(text),
       "Belegfeld 1": number,
+      "EU-Land u. UStID": eu_vat_id,
     })
 
   if credited_at is not None:
@@ -232,6 +235,7 @@ def createAccountingRecords(revenue_item):
       "BU-Schlüssel": accounting_props["datev_tax_key"],
       "Buchungstext": "Erstattung {}".format(text),
       "Belegfeld 1": number,
+      "EU-Land u. UStID": eu_vat_id,
     })
 
   for line_item in line_items:
@@ -258,6 +262,7 @@ def createAccountingRecords(revenue_item):
         "Konto": accounting_props["revenue_account"],
         "Gegenkonto (ohne BU-Schlüssel)": "990",
         "Buchungstext": "{} / pRAP nach {}".format(text, "{}..{}".format(forward_months[0]["start"].strftime("%Y-%m"), forward_months[-1]["start"].strftime("%Y-%m")) if len(forward_months) > 1 else forward_months[0]["start"].strftime("%Y-%m")),
+        "EU-Land u. UStID": eu_vat_id,
       })
 
       for month in forward_months:
@@ -269,6 +274,7 @@ def createAccountingRecords(revenue_item):
           "Konto": "990",
           "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
           "Buchungstext": "{} / pRAP aus {}".format(text, created.strftime("%Y-%m")),
+          "EU-Land u. UStID": eu_vat_id,
         })
 
   return records
