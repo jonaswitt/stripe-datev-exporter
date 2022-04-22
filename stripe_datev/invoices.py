@@ -48,6 +48,15 @@ def retrieveInvoice(id):
   invoices_cached[invoice.id] = invoice
   return invoice
 
+tax_rates_cached = {}
+
+def retrieveTaxRate(id):
+  if id in tax_rates_cached:
+    return tax_rates_cached[id]
+  tax_rate = stripe.TaxRate.retrieve(id)
+  tax_rates_cached[id] = tax_rate
+  return tax_rate
+
 def getLineItemRecognitionRange(line_item, invoice):
   created = datetime.fromtimestamp(invoice.created, timezone.utc)
 
@@ -112,6 +121,11 @@ def createRevenueItems(invs):
     amount_net = amount_with_tax
     if invoice.tax:
       amount_net -= decimal.Decimal(invoice.tax) / 100
+
+    tax_percentage = None
+    if len(invoice.total_tax_amounts) > 0:
+      rate = retrieveTaxRate(invoice.total_tax_amounts[0]["tax_rate"])
+      tax_percentage = decimal.Decimal(rate["percentage"])
     amount_with_tax *= invoice_discount_factor
     amount_net *= invoice_discount_factor
 
@@ -157,6 +171,7 @@ def createRevenueItems(invs):
       "accounting_props": accounting_props,
       "customer": cus,
       "amount_with_tax": amount_with_tax,
+      "tax_percentage": tax_percentage,
       "text": "Invoice {}".format(invoice.number),
       "voided_at": voided_at,
       "credited_at": credited_at,

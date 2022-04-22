@@ -95,6 +95,8 @@ def createRevenueItems(charges):
     tax_amount = decimal.Decimal(session.total_details.amount_tax) / 100 if session else None
     net_amount = charge_amount - tax_amount if tax_amount is not None else charge_amount
 
+    tax_percentage = None if tax_amount is None else decimal.Decimal(tax_amount) / decimal.Decimal(net_amount) * 100
+
     revenue_items.append({
       "id": charge.id,
       "number": charge.receipt_number,
@@ -103,6 +105,7 @@ def createRevenueItems(charges):
       "accounting_props": accounting_props,
       "customer": cus,
       "amount_with_tax": charge_amount,
+      "tax_percentage": tax_percentage,
       "line_items": [{
         "recognition_start": start,
         "recognition_end": end,
