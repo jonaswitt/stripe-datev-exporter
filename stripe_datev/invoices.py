@@ -175,6 +175,7 @@ def createAccountingRecords(revenue_item):
   voided_at = revenue_item.get("voided_at", None)
   credited_at = revenue_item.get("credited_at", None)
   credited_amount = revenue_item.get("credited_amount", None)
+  number = revenue_item["number"]
 
   records = []
 
@@ -187,6 +188,7 @@ def createAccountingRecords(revenue_item):
     "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
     "BU-Schlüssel": accounting_props["datev_tax_key"],
     "Buchungstext": text,
+    "Belegfeld 1": number,
   })
 
   if voided_at is not None:
@@ -200,6 +202,7 @@ def createAccountingRecords(revenue_item):
       "Gegenkonto (ohne BU-Schlüssel)": accounting_props["customer_account"],
       "BU-Schlüssel": accounting_props["datev_tax_key"],
       "Buchungstext": "Storno {}".format(text),
+      "Belegfeld 1": number,
     })
 
   if credited_at is not None:
@@ -213,6 +216,7 @@ def createAccountingRecords(revenue_item):
       "Gegenkonto (ohne BU-Schlüssel)": accounting_props["customer_account"],
       "BU-Schlüssel": accounting_props["datev_tax_key"],
       "Buchungstext": "Erstattung {}".format(text),
+      "Belegfeld 1": number,
     })
 
   for line_item in line_items:

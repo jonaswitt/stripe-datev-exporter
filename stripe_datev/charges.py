@@ -1,7 +1,7 @@
 import stripe
 import decimal
 from datetime import datetime, timezone
-from . import customer, dateparser, output, config
+from . import customer, dateparser, output, config, invoices
 
 def listChargesRaw(fromTime, toTime):
   starting_after = None
@@ -127,6 +127,12 @@ def createAccountingRecords(charges):
     fee_amount = decimal.Decimal(balance_transaction.fee_details[0].amount) / 100
     fee_desc = balance_transaction.fee_details[0].description
 
+    if charge.invoice:
+      invoice = invoices.retrieveInvoice(charge.invoice)
+      number = invoice.number
+    else:
+      number = charge.receipt_number
+
     records.append({
       "date": created,
       "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(decimal.Decimal(charge.amount) / 100),
@@ -135,6 +141,7 @@ def createAccountingRecords(charges):
       "Konto": "1201",
       "Gegenkonto (ohne BU-Schlüssel)": acc_props["customer_account"],
       "Buchungstext": "Stripe Payment ({})".format(charge.id),
+      "Belegfeld 1": number,
     })
 
     records.append({
