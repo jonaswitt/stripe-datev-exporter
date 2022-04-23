@@ -126,8 +126,9 @@ def createRevenueItems(invs):
     if len(invoice.total_tax_amounts) > 0:
       rate = retrieveTaxRate(invoice.total_tax_amounts[0]["tax_rate"])
       tax_percentage = decimal.Decimal(rate["percentage"])
-    amount_with_tax *= invoice_discount_factor
-    amount_net *= invoice_discount_factor
+    # Do not apply invoice_discount_factor to net/with tax invoice
+    # amounts (for DATEV, we create refund bookings), only
+    # to line items (below) for revenue recognition
 
     finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(config.accounting_tz)
 
