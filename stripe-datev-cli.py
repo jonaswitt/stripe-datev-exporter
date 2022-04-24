@@ -178,5 +178,26 @@ class StripeDatevCli(object):
     def run_validate_customers(self):
       stripe_datev.customer.validate_customers()
 
+    def run_opos(self):
+        eoy = stripe_datev.config.accounting_tz.localize(datetime.now())
+        # eoy = stripe_datev.config.accounting_tz.localize(datetime(2022, 4, 24, 0, 0, 0, 0) - timedelta(seconds=1))
+        print("Unpaid invoices as of", eoy)
+
+        invoices = stripe.Invoice.list(
+          created={
+            "lte": int(eoy.timestamp()),
+            "gte": int((eoy - datedelta.YEAR).timestamp()),
+          },
+        ).auto_paging_iter()
+
+        for invoice in invoices:
+          if invoice.status_transitions.get("marked_uncollectible_at", None) or invoice.status_transitions.get("voided_at", None):
+            continue
+          due_date = stripe_datev.config.accounting_tz.localize(datetime.utcfromtimestamp(invoice.due_date if invoice.due_date else invoice.created))
+          paid_at = invoice.status_transitions.get("paid_at", None)
+          customer = stripe_datev.customer.retrieveCustomer(invoice.customer)
+          if not paid_at or stripe_datev.config.accounting_tz.localize(datetime.utcfromtimestamp(paid_at)) > eoy:
+            print(invoice.number, format(decimal.Decimal(invoice.total) / 100, ".2f").rjust(10, " "), "EUR", customer.email.ljust(35, " "), "due", due_date.date(), "({} overdue)".format(eoy - due_date) if due_date < eoy else "")
+
 if __name__ == '__main__':
     StripeDatevCli(sys.argv).run()
