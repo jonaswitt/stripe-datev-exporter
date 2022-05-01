@@ -121,7 +121,7 @@ def createAccountingRecords(charges):
   records = []
 
   for charge in charges:
-    acc_props = customer.getAccountingProps(None)
+    acc_props = customer.getAccountingProps(customer.retrieveCustomer(charge.customer))
     created = datetime.fromtimestamp(charge.created, timezone.utc)
 
     balance_transaction = stripe.BalanceTransaction.retrieve(charge.balance_transaction)
