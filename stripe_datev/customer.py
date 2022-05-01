@@ -127,16 +127,17 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
     props["vat_region"] = "EU"
 
   if tax_exempt == "reverse" or tax_exempt == "exempt" or invoice_tax is None or invoice_tax == 0:
-    if tax_exempt == "exempt":
-      print("Warning: tax exempt customer, treating like 'reverse'", customer["id"])
-      props["tax_exempt"] = "reverse"
-    if tax_exempt == "none":
-      print("Warning: taxable customer without tax on invoice, treating like 'reverse'", customer["id"], invoice.get("id", "n/a") if invoice is not None else "n/a")
-      props["tax_exempt"] = "reverse"
-    if not (invoice_tax is None or invoice_tax == 0):
-      print("Warning: tax on invoice of reverse charge customer", invoice.get("id", "n/a") if invoice is not None else "n/a")
-    if country in country_codes_eu and vat_id is None:
-      print("Warning: EU reverse charge customer without VAT ID", customer["id"])
+    if invoice is not None:
+      if tax_exempt == "exempt":
+        print("Warning: tax exempt customer, treating like 'reverse'", customer["id"])
+        props["tax_exempt"] = "reverse"
+      if tax_exempt == "none":
+        print("Warning: taxable customer without tax on invoice, treating like 'reverse'", customer["id"], invoice.get("id", "n/a") if invoice is not None else "n/a")
+        props["tax_exempt"] = "reverse"
+      if not (invoice_tax is None or invoice_tax == 0):
+        print("Warning: tax on invoice of reverse charge customer", invoice.get("id", "n/a") if invoice is not None else "n/a")
+      if country in country_codes_eu and vat_id is None:
+        print("Warning: EU reverse charge customer without VAT ID", customer["id"])
 
     if country in country_codes_eu and vat_id is not None:
       props["revenue_account"] = "8336"
