@@ -101,7 +101,7 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
   else:
     tax_exempt = customer.get("tax_exempt", None)
 
-  vat_id = customer.get("vat_id", None)
+  vat_id = getValidEuVatId(customer)
 
   props = dict(props, **{
     "country": country,
@@ -165,22 +165,17 @@ def getCustomerAccount(customer, invoice=None, checkout_session=None):
 def getDatevTaxKey(customer, invoice=None, checkout_session=None):
   return getAccountingProps(customer, invoice=invoice, checkout_session=checkout_session)["datev_tax_key"]
 
-def all_customers():
-  starting_after = None
-  while True:
-    response = stripe.Customer.list(
-      starting_after=starting_after,
-      limit=10
-    )
-    # print("Fetched {} customers".format(len(response.data)))
-    if len(response.data) == 0:
-      break
-    starting_after = response.data[-1].id
-    for item in response.data:
-      yield item
+def getValidEuVatId(customer):
+  if "tax_ids" not in customer:
+    return None
+  tax_id = next((tax_id for tax_id in customer.tax_ids.data if tax_id.type == "eu_vat" and tax_id.verification.status == "verified"), None)
+  if tax_id is None:
+    return None
+  return tax_id.value
 
 def validate_customers():
-  for customer in stripe.Customer.list().auto_paging_iter():
+  customer_count = 0
+  for customer in stripe.Customer.list(expand=["data.tax_ids"]).auto_paging_iter():
     if not customer.address:
       print("Warning: customer without address", customer.id)
 
@@ -188,6 +183,10 @@ def validate_customers():
       print("Warning: exempt customer", customer.id)
 
     getAccountingProps(customer)
+
+    customer_count += 1
+
+  print("Validated {} customers".format(customer_count))
 
 def fill_account_numbers():
   highest_account_number = None
