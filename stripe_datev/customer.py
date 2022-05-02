@@ -188,3 +188,34 @@ def validate_customers():
       print("Warning: exempt customer", customer.id)
 
     getAccountingProps(customer)
+
+def fill_account_numbers():
+  highest_account_number = None
+  fill_customers = []
+  for customer in stripe.Customer.list().auto_paging_iter():
+    if "accountNumber" in customer.metadata:
+      highest_account_number = int(customer.metadata["accountNumber"])
+      break
+    fill_customers.append(customer)
+
+  if highest_account_number is None:
+    highest_account_number = 10100 - 1
+
+  print("{} customers without account number, highest number is {}".format(len(fill_customers), highest_account_number))
+
+  for customer in reversed(fill_customers):
+    # print(customer.id, customer.metadata)
+
+    highest_account_number += 1
+    metadata_new = {
+      "accountNumber": str(highest_account_number)
+    }
+
+    for old_key in ["subscribedNetPrice", "subscribedProduct", "subscribedProductName", "subscribedTaxRate", "subscribedTotal"]:
+      if old_key in customer.metadata:
+        metadata_new[old_key] = ""
+
+    # print("Update", metadata_new)
+    stripe.Customer.modify(customer.id, metadata=metadata_new)
+
+    print(customer.id, highest_account_number)
