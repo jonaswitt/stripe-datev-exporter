@@ -1,5 +1,5 @@
 from datetime import datetime
-from . import config
+from . import config, customer
 
 fields = [
   "Umsatz (ohne Soll/Haben-Kz)",
@@ -191,3 +191,77 @@ def formatDateHuman(date):
 
 def formatDecimal(d):
   return "{0:.2f}".format(d).replace(",", "").replace(".", ",")
+
+fields_accounts = [
+  "Konto",
+  "Name (Adressattyp Unternehmen)",
+  "Unternehmensgegenstand",
+  "Name (Adressattyp natürl. Person)",
+  "Vorname (Adressattyp natürl. Person)",
+  "Name (Adressattyp keine Angabe)",
+  "Adressattyp", # 1 = natürl. Person 2 = Unternehmen
+  "Kurzbezeichnung",
+  "EU-Land",
+  "EU-UStID",
+  "Anrede",
+  "Straße",
+  "Postfach",
+  "Postleitzahl",
+  "Ort",
+  "Land",
+  "Adresszusatz",
+  "E-Mail",
+]
+
+def printAccounts(textFileHandle, customers):
+  header = [
+    '"EXTF"', # DATEV-Format (DTVF - von DATEV erzeugt, EXTF Fremdprogramm)
+    '700', # Version des DATEV-Formats (141 bedeutet 1.41)
+    '16', # Datenkategorie (21 = Buchungsstapel, 67 = Buchungstextkonstanten, 16 = Debitoren/Kreditoren, 20 = Kontenbeschriftungen usw.)
+    'Debitoren/Kreditoren', # Formatname (Buchungsstapel, Buchungstextkonstanten, Debitoren/Kreditoren, Kontenbeschriftungen usw.)
+    '9', # Formatversion (bezogen auf Formatname)
+    datetime.today().astimezone(config.accounting_tz).strftime("%Y%m%d%H%M%S"), # '20190211202957107', # erzeugt am
+    '', # importiert am
+    'BH', # Herkunft
+    '', # exportiert von
+    '', # importiert von
+    '1', # Beraternummer
+    '1', # Mandantennummer
+    datetime.today().astimezone(config.accounting_tz).strftime('%Y') + '0101', # Wirtschaftsjahresbeginn
+    '4', # Sachkontenlänge
+    '', # Datum Beginn Buchungsstapel
+    '', # Datum Ende Buchungsstapel
+    '', # Bezeichnung (Vorlaufname, z. B. Buchungsstapel)
+    '', # Diktatkürzel
+    '0', # Buchungstyp (bei Buchungsstapel = 1)
+    '0', # Rechnungslegungszweck
+    '0', # Festschreibung
+    # 'EUR', # WKZ
+  ]
+  textFileHandle.write(";".join(header))
+  textFileHandle.write("\n")
+
+  textFileHandle.write(";".join(fields_accounts))
+  textFileHandle.write("\n")
+
+  for cus in customers:
+    acc_props = customer.getAccountingProps(cus)
+    vat_id = acc_props["vat_id"]
+
+    record = {
+      "Konto": acc_props["customer_account"],
+      "Name (Adressattyp Unternehmen)": cus.name or cus.description,
+      "Adressattyp": "2",
+      "EU-Land": vat_id[:2] if vat_id is not None else "",
+      "EU-UStID": vat_id if vat_id is not None else "",
+      "Straße": cus.address.line1 or "",
+      "Adresszusatz": cus.address.line2 or "",
+      "Postleitzahl": cus.address.postal_code or "",
+      "Ort": cus.address.city or "",
+      "Land": cus.address.country or "",
+      "E-Mail": cus.email or "",
+    }
+
+    recordValues = [record.get(f, '') for f in fields_accounts]
+    textFileHandle.write(";".join(recordValues))
+    textFileHandle.write("\n")

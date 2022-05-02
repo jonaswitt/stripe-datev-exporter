@@ -1,4 +1,7 @@
+import sys
 import stripe
+
+from stripe_datev import config, output
 
 customers_cached = {}
 
@@ -218,3 +221,7 @@ def fill_account_numbers():
     stripe.Customer.modify(customer.id, metadata=metadata_new)
 
     print(customer.id, highest_account_number)
+
+def list_account_numbers():
+  customer_it = stripe.Customer.list(expand=["data.tax_ids"]).auto_paging_iter()
+  output.printAccounts(sys.stdout, customer_it)
