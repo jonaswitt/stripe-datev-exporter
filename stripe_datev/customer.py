@@ -86,8 +86,6 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
     "customer_account": "10001",
     "vat_region": "World",
   }
-  if customer is None:
-    return props
 
   country = customer.get("country", None)
 
@@ -182,26 +180,11 @@ def all_customers():
       yield item
 
 def validate_customers():
-  for customer in all_customers():
-    # print(customer)
+  for customer in stripe.Customer.list().auto_paging_iter():
     if not customer.address:
       print("Warning: customer without address", customer.id)
-      continue
 
-    country = customer.address.country
-    tax_exempt = customer.tax_exempt
-    vat_id = customer.tax_info.tax_id if customer.tax_info is not None else None
-
-    if country == "DE":
-      if tax_exempt != "none":
-        print("Warning: DE customer tax status is", tax_exempt, customer.id)
-
-    elif tax_exempt == "reverse":
-      if country in ["ES", "IT", "GB"] and vat_id is None:
-        print("Warning: EU reverse charge customer without VAT ID", customer.id)
-
-    # elif tax_exempt == "none":
-    #   print("Warning: configure taxation for", country, "customer", customer.id)
-
-    elif tax_exempt == "exempt":
+    if customer.tax_exempt == "exempt":
       print("Warning: exempt customer", customer.id)
+
+    getAccountingProps(customer)
