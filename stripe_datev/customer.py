@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import sys
 import stripe
 
@@ -71,11 +72,15 @@ country_codes_eu = [
 
 def getAccountingProps(customer, invoice=None, checkout_session=None):
   props = {
-    "customer_account": "10001",
     "vat_region": "World",
   }
 
-  country = customer.get("country", None)
+  if (invoice is None or datetime.fromtimestamp(invoice.created, timezone.utc) >= datetime(2022, 1, 1, 0, 0).astimezone(config.accounting_tz)):
+    if not customer.metadata.get("accountNumber", None):
+      raise Exception("Expected 'accountNumber' in metadata")
+    props["customer_account"] = customer.metadata["accountNumber"]
+  else:
+    props["customer_account"] = "10001"
 
   address = customer.address or customer.shipping.address
   country = address.country
