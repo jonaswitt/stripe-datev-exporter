@@ -31,29 +31,14 @@ tax_ids_cached = {}
 def getCustomerTaxId(customer):
   if customer.id in tax_ids_cached:
     return tax_ids_cached[customer.id]
-  ids = stripe.Customer.list_tax_ids(customer.id, limit=10).data
-  tax_id = ids[0].value if len(ids) > 0 else None
+  if "tax_ids" in customer:
+    tax_id = next((tax_id for tax_id in customer.tax_ids.data if tax_id.type == "eu_vat" and tax_id.verification.status == "verified"), None)
+    tax_id = tax_id.value if tax_id is not None else None
+  else:
+    ids = stripe.Customer.list_tax_ids(customer.id, limit=10).data
+    tax_id = ids[0].value if len(ids) > 0 else None
   tax_ids_cached[customer.id] = tax_id
   return tax_id
-
-def getCustomerDetails(customer):
-  record = {
-    "id": customer.id
-  }
-  if "deleted" in customer and customer.deleted:
-    record["name"] = customer.id
-  else:
-    record["name"] = getCustomerName(customer)
-    if customer.address is not None:
-      record["country"] = customer.address.country
-    elif customer.shipping is not None:
-      record["country"] = customer.shipping.address.country
-    if record["country"] in country_codes_eu:
-      tax_id = getCustomerTaxId(customer)
-      record["vat_id"] = tax_id
-    if customer.tax_exempt:
-      record["tax_exempt"] = customer.tax_exempt
-  return record
 
 country_codes_eu = [
   "AT",
@@ -92,6 +77,9 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
 
   country = customer.get("country", None)
 
+  address = customer.address or customer.shipping.address
+  country = address.country
+
   invoice_tax = None
   if invoice is not None:
     invoice_tax = invoice.get("tax", None)
@@ -102,9 +90,9 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
   if invoice is not None and "customer_tax_exempt" in invoice:
     tax_exempt = invoice["customer_tax_exempt"]
   else:
-    tax_exempt = customer.get("tax_exempt", None)
+    tax_exempt = customer.tax_exempt
 
-  vat_id = getValidEuVatId(customer)
+  vat_id = getCustomerTaxId(customer)
 
   props = dict(props, **{
     "country": country,
@@ -118,7 +106,7 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
     if invoice is not None and invoice_tax is None:
       print("Warning: no tax in DE invoice", invoice["id"])
     if tax_exempt != "none":
-      print("Warning: DE customer tax status is", tax_exempt, customer["id"])
+      print("Warning: DE customer tax status is", tax_exempt, customer.id)
     props["revenue_account"] = "8400"
     # props["datev_tax_key"] = "9"
     props["vat_region"] = "DE"
@@ -130,15 +118,15 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
   if tax_exempt == "reverse" or tax_exempt == "exempt" or invoice_tax is None or invoice_tax == 0:
     if invoice is not None:
       if tax_exempt == "exempt":
-        print("Warning: tax exempt customer, treating like 'reverse'", customer["id"])
+        print("Warning: tax exempt customer, treating like 'reverse'", customer.id)
         props["tax_exempt"] = "reverse"
       if tax_exempt == "none":
-        print("Warning: taxable customer without tax on invoice, treating like 'reverse'", customer["id"], invoice.get("id", "n/a") if invoice is not None else "n/a")
+        print("Warning: taxable customer without tax on invoice, treating like 'reverse'", customer.id, invoice.get("id", "n/a") if invoice is not None else "n/a")
         props["tax_exempt"] = "reverse"
       if not (invoice_tax is None or invoice_tax == 0):
         print("Warning: tax on invoice of reverse charge customer", invoice.get("id", "n/a") if invoice is not None else "n/a")
       if country in country_codes_eu and vat_id is None:
-        print("Warning: EU reverse charge customer without VAT ID", customer["id"])
+        print("Warning: EU reverse charge customer without VAT ID", customer.id)
 
     if country in country_codes_eu and vat_id is not None:
       props["revenue_account"] = "8336"
@@ -149,12 +137,12 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
     return props
 
   elif tax_exempt == "none":
-    # print("Warning: configure taxation for", country, "customer", customer["id"])
+    # print("Warning: configure taxation for", country, "customer", customer.id)
     # Unter Bagtellgrenze MOSS
     pass
 
   else:
-    print("Warning: unknown tax status for customer", customer["id"])
+    print("Warning: unknown tax status for customer", customer.id)
 
   props["revenue_account"] = "8400"
   return props
@@ -167,14 +155,6 @@ def getCustomerAccount(customer, invoice=None, checkout_session=None):
 
 def getDatevTaxKey(customer, invoice=None, checkout_session=None):
   return getAccountingProps(customer, invoice=invoice, checkout_session=checkout_session)["datev_tax_key"]
-
-def getValidEuVatId(customer):
-  if "tax_ids" not in customer:
-    return None
-  tax_id = next((tax_id for tax_id in customer.tax_ids.data if tax_id.type == "eu_vat" and tax_id.verification.status == "verified"), None)
-  if tax_id is None:
-    return None
-  return tax_id.value
 
 def validate_customers():
   customer_count = 0

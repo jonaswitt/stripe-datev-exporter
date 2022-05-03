@@ -78,7 +78,7 @@ def createRevenueItems(charges):
     cus = customer.retrieveCustomer(charge.customer)
     session = getCheckoutSessionViaPaymentIntentCached(charge.payment_intent)
 
-    accounting_props = customer.getAccountingProps(customer.getCustomerDetails(cus), checkout_session=session)
+    accounting_props = customer.getAccountingProps(cus, checkout_session=session)
     if charge.receipt_number:
       text = "Receipt {}".format(charge.receipt_number)
     else:

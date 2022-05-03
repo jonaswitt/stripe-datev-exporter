@@ -116,7 +116,7 @@ def createRevenueItems(invs):
     line_items = []
 
     cus = customer.retrieveCustomer(invoice.customer)
-    accounting_props = customer.getAccountingProps(customer.getCustomerDetails(cus), invoice=invoice)
+    accounting_props = customer.getAccountingProps(cus, invoice=invoice)
     amount_with_tax = decimal.Decimal(invoice.total) / 100
     amount_net = amount_with_tax
     if invoice.tax:
@@ -306,7 +306,7 @@ def to_csv(inv):
     if invoice.status == "void":
       continue
     cus = customer.retrieveCustomer(invoice.customer)
-    props = customer.getAccountingProps(customer.getCustomerDetails(cus), invoice=invoice)
+    props = customer.getAccountingProps(cus, invoice=invoice)
 
     total = decimal.Decimal(invoice.total) / 100
     tax = decimal.Decimal(invoice.tax) / 100 if invoice.tax else None
