@@ -188,6 +188,7 @@ class StripeDatevCli(object):
             "lte": int(eoy.timestamp()),
             "gte": int((eoy - datedelta.YEAR).timestamp()),
           },
+          expand=["data.customer"]
         ).auto_paging_iter()
 
         for invoice in invoices:
