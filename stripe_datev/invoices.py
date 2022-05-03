@@ -9,44 +9,38 @@ import datedelta
 invoices_cached = {}
 
 def listFinalizedInvoices(fromTime, toTime):
-  starting_after = None
-  invoices = []
-  while True:
-    response = stripe.Invoice.list(
-      starting_after=starting_after,
-      created={
-        "lt": int(toTime.timestamp())
-      },
-      due_date={
-        "gte": int(fromTime.timestamp()),
-      },
-      limit=50,
-    )
-    # print("Fetched {} invoices".format(len(response.data)))
-    if len(response.data) == 0:
-      break
-    starting_after = response.data[-1].id
-    for invoice in response.data:
-      if invoice.status == "draft":
-        continue
-      finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(config.accounting_tz)
-      if finalized_date < fromTime or finalized_date >= toTime:
-        # print("Skipping invoice {}, created {} finalized {} due {}".format(invoice.id, created_date, finalized_date, due_date))
-        continue
-      invoices.append(invoice)
-      invoices_cached[invoice.id] = invoice
+  invoices = stripe.Invoice.list(
+    created={
+      "lt": int(toTime.timestamp())
+    },
+    due_date={
+      "gte": int(fromTime.timestamp()),
+    },
+    expand=["data.customer", "data.customer.tax_ids"]
+  ).auto_paging_iter()
 
-    if not response.has_more:
-      break
-
-  return list(reversed(invoices))
+  for invoice in invoices:
+    if invoice.status == "draft":
+      continue
+    finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(config.accounting_tz)
+    if finalized_date < fromTime or finalized_date >= toTime:
+      # print("Skipping invoice {}, created {} finalized {} due {}".format(invoice.id, created_date, finalized_date, due_date))
+      continue
+    invoices_cached[invoice.id] = invoice
+    yield invoice
 
 def retrieveInvoice(id):
-  if id in invoices_cached:
-    return invoices_cached[id]
-  invoice = stripe.Invoice.retrieve(id)
-  invoices_cached[invoice.id] = invoice
-  return invoice
+  if isinstance(id, str):
+    if id in invoices_cached:
+      return invoices_cached[id]
+    invoice = stripe.Invoice.retrieve(id, expand=["customer", "customer.tax_ids"])
+    invoices_cached[invoice.id] = invoice
+    return invoice
+  elif isinstance(id, stripe.Invoice):
+    invoices_cached[id.id] = id
+    return id
+  else:
+    raise Exception("Unexpected retrieveInvoice() argument: {}".format(id))
 
 tax_rates_cached = {}
 

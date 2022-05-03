@@ -4,31 +4,17 @@ from datetime import datetime, timezone
 from . import customer, dateparser, output, config, invoices
 
 def listChargesRaw(fromTime, toTime):
-  starting_after = None
-  charges = []
-  while True:
-    response = stripe.Charge.list(
-      starting_after=starting_after,
-      created={
-        "gte": int(fromTime.timestamp()),
-        "lt": int(toTime.timestamp())
-      },
-      limit=50,
-    )
-    if len(response.data) == 0:
-      break
-    starting_after = response.data[-1].id
-
-    for charge in response.data:
-      if not charge.paid or not charge.captured:
-        continue
-
-      charges.append(charge)
-
-    if not response.has_more:
-      break
-
-  return charges
+  charges = stripe.Charge.list(
+    created={
+      "gte": int(fromTime.timestamp()),
+      "lt": int(toTime.timestamp())
+    },
+    expand=["data.customer", "data.customer.tax_ids", "data.invoice"]
+  ).auto_paging_iter()
+  for charge in charges:
+    if not charge.paid or not charge.captured:
+      continue
+    yield charge
 
 def chargeHasInvoice(charge):
   return charge.invoice is not None

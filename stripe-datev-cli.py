@@ -56,12 +56,12 @@ class StripeDatevCli(object):
         print("Retrieving data between {} and {}".format(fromTime.strftime("%Y-%m-%d"), (toTime - timedelta(0, 1)).strftime("%Y-%m-%d")))
         thisMonth = fromTime.astimezone(stripe_datev.config.accounting_tz).strftime("%Y-%m")
 
-        invoices = stripe_datev.invoices.listFinalizedInvoices(fromTime, toTime)
+        invoices = list(reversed(list(stripe_datev.invoices.listFinalizedInvoices(fromTime, toTime))))
         print("Retrieved {} invoice(s), total {} EUR".format(len(invoices), sum([decimal.Decimal(i.total) / 100 for i in invoices])))
 
         revenue_items = stripe_datev.invoices.createRevenueItems(invoices)
 
-        charges = stripe_datev.charges.listChargesRaw(fromTime, toTime)
+        charges = list(stripe_datev.charges.listChargesRaw(fromTime, toTime))
         print("Retrieved {} charge(s), total {} EUR".format(len(charges), sum([decimal.Decimal(c.amount) / 100 for c in charges])))
 
         direct_charges = list(filter(lambda charge: not stripe_datev.charges.chargeHasInvoice(charge), charges))
@@ -110,7 +110,9 @@ class StripeDatevCli(object):
 
         # Datev payouts
 
-        payoutObjects = stripe_datev.payouts.listPayouts(fromTime, toTime)
+        payoutObjects = list(stripe_datev.payouts.listPayouts(fromTime, toTime))
+        print("Retrieved {} payout(s), total {} EUR".format(len(payoutObjects), sum([r["amount"] for r in payoutObjects])))
+
         payout_records = stripe_datev.payouts.createAccountingRecords(payoutObjects)
         stripe_datev.output.writeRecords(os.path.join(datevDir, "EXTF_{}_Payouts.csv".format(thisMonth)), payout_records)
 

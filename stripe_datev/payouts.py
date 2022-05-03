@@ -9,14 +9,14 @@ def listPayouts(fromTime, toTime):
       "gte": int(fromTime.timestamp()),
       "lt": int(toTime.timestamp())
     },
-    limit=100, # TODO: pagination
-  )
+    expand=["data.balance_transaction"]
+  ).auto_paging_iter()
 
-  payoutRecords = []
   for payout in payouts:
-    # print(payout)
     assert payout.status == "paid"
     assert payout.currency == "eur"
+    balance_transaction = payout.balance_transaction
+    assert len(balance_transaction.fee_details) == 0
 
     record = {
       "id": payout.id,
@@ -24,14 +24,7 @@ def listPayouts(fromTime, toTime):
       "arrival_date": datetime.fromtimestamp(payout.created, timezone.utc),
       "description": payout.description,
     }
-
-    balance_transaction = stripe.BalanceTransaction.retrieve(payout.balance_transaction)
-    assert len(balance_transaction.fee_details) == 0
-
-    payoutRecords.append(record)
-  print("Retrieved {} payout(s), total {} EUR".format(len(payoutRecords), sum([r["amount"] for r in payoutRecords])))
-  return payoutRecords
-
+    yield record
 
 def createAccountingRecords(payouts):
   records = []

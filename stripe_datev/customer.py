@@ -17,7 +17,7 @@ def retrieveCustomer(id):
     customers_cached[id.id] = id
     return id
   else:
-    raise "Unexpected retrieveCustomer() argument: {}".format(id)
+    raise Exception("Unexpected retrieveCustomer() argument: {}".format(id))
 
 def getCustomerName(customer):
   if customer.get("deleted", False):
