@@ -32,17 +32,27 @@ if not os.path.exists(out_dir):
 
 class StripeDatevCli(object):
 
-    def __init__(self, argv):
-        self.argv = argv
-
-    def run(self):
+    def run(self, argv):
         parser = argparse.ArgumentParser(
-          description='Stripe DATEV Exporter',
+          description='Stripe utility',
         )
+        parser.add_argument('command', type=str, help='Subcommand to run', choices=[
+          'download',
+          'validate_customers',
+          'fill_account_numbers',
+          'list_accounts',
+          'opos'
+        ])
+
+        args = parser.parse_args(argv[1:2])
+        getattr(self, args.command)(argv[2:])
+
+    def download(self, argv):
+        parser = argparse.ArgumentParser(prog="stripe-datev-cli.py download")
         parser.add_argument('year', type=int, help='year to download data for')
         parser.add_argument('month', type=int, help='month to download data for')
 
-        args = parser.parse_args(self.argv[1:])
+        args = parser.parse_args(argv)
 
         year = int(args.year)
         month = int(args.month)
@@ -157,51 +167,37 @@ class StripeDatevCli(object):
           with open(filePath, "wb") as fp:
             fp.write(r.content)
 
-
-    def run_records(self):
-      records = []
-
-      # Invoice before first revenue period
-      records += stripe_datev.invoices.accrualRecords(datetime(2019, 12, 18), 100, 10001, 8338, "Invoice 2", datetime(2020, 1, 1), 12, False)
-
-      # Invoice in first revenue period
-      records += stripe_datev.invoices.accrualRecords(datetime(2020, 1, 13), 100, 10002, 8400, "Invoice 2", datetime(2020, 1, 1), 12, False)
-
-      # fromTime = datetime(2020, 1, 1)
-      fromTime = min([r["date"] for r in records])
-      toTime = max([r["date"] for r in records])
-
-      datevDir = os.path.join(out_dir, 'datev')
-      if not os.path.exists(datevDir):
-        os.mkdir(datevDir)
-      with open(os.path.join(datevDir, "EXTF_accrual.csv"), 'w', encoding="latin1", errors="replace", newline="\r\n") as fp:
-          stripe_datev.output.printRecords(fp, records, fromTime, toTime)
-
-    def run_validate_customers(self):
+    def validate_customers(self, argv):
       stripe_datev.customer.validate_customers()
 
-    def run_opos(self):
-        eoy = stripe_datev.config.accounting_tz.localize(datetime.now())
-        # eoy = stripe_datev.config.accounting_tz.localize(datetime(2022, 4, 24, 0, 0, 0, 0) - timedelta(seconds=1))
-        print("Unpaid invoices as of", eoy)
+    def fill_account_numbers(self, argv):
+      stripe_datev.customer.fill_account_numbers()
 
-        invoices = stripe.Invoice.list(
-          created={
-            "lte": int(eoy.timestamp()),
-            "gte": int((eoy - datedelta.YEAR).timestamp()),
-          },
-          status="open", # comment out if 'eoy' is not now()
-          expand=["data.customer"]
-        ).auto_paging_iter()
+    def list_accounts(self, argv):
+      stripe_datev.customer.list_account_numbers()
 
-        for invoice in invoices:
-          if invoice.status_transitions.get("marked_uncollectible_at", None) or invoice.status_transitions.get("voided_at", None):
-            continue
-          due_date = stripe_datev.config.accounting_tz.localize(datetime.utcfromtimestamp(invoice.due_date if invoice.due_date else invoice.created))
-          paid_at = invoice.status_transitions.get("paid_at", None)
-          customer = stripe_datev.customer.retrieveCustomer(invoice.customer)
-          if not paid_at or stripe_datev.config.accounting_tz.localize(datetime.utcfromtimestamp(paid_at)) > eoy:
-            print(invoice.number, format(decimal.Decimal(invoice.total) / 100, ".2f").rjust(10, " "), "EUR", customer.email.ljust(35, " "), "due", due_date.date(), "({} overdue)".format(eoy - due_date) if due_date < eoy else "")
+    def opos(self, argv):
+      eoy = stripe_datev.config.accounting_tz.localize(datetime.now())
+      # eoy = stripe_datev.config.accounting_tz.localize(datetime(2022, 4, 24, 0, 0, 0, 0) - timedelta(seconds=1))
+      print("Unpaid invoices as of", eoy)
+
+      invoices = stripe.Invoice.list(
+        created={
+          "lte": int(eoy.timestamp()),
+          "gte": int((eoy - datedelta.YEAR).timestamp()),
+        },
+        status="open", # comment out if 'eoy' is not now()
+        expand=["data.customer"]
+      ).auto_paging_iter()
+
+      for invoice in invoices:
+        if invoice.status_transitions.get("marked_uncollectible_at", None) or invoice.status_transitions.get("voided_at", None):
+          continue
+        due_date = stripe_datev.config.accounting_tz.localize(datetime.utcfromtimestamp(invoice.due_date if invoice.due_date else invoice.created))
+        paid_at = invoice.status_transitions.get("paid_at", None)
+        customer = stripe_datev.customer.retrieveCustomer(invoice.customer)
+        if not paid_at or stripe_datev.config.accounting_tz.localize(datetime.utcfromtimestamp(paid_at)) > eoy:
+          print(invoice.number, format(decimal.Decimal(invoice.total) / 100, ".2f").rjust(10, " "), "EUR", customer.email.ljust(35, " "), "due", due_date.date(), "({} overdue)".format(eoy - due_date) if due_date < eoy else "")
 
 if __name__ == '__main__':
-    StripeDatevCli(sys.argv).run()
+    StripeDatevCli().run(sys.argv)
