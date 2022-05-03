@@ -190,6 +190,7 @@ class StripeDatevCli(object):
             "lte": int(eoy.timestamp()),
             "gte": int((eoy - datedelta.YEAR).timestamp()),
           },
+          status="open", # comment out if 'eoy' is not now()
           expand=["data.customer"]
         ).auto_paging_iter()
 
