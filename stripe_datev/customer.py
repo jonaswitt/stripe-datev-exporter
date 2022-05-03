@@ -10,7 +10,7 @@ def retrieveCustomer(id):
   if isinstance(id, str):
     if id in customers_cached:
       return customers_cached[id]
-    cus = stripe.Customer.retrieve(id)
+    cus = stripe.Customer.retrieve(id, expand=["tax_ids"])
     customers_cached[cus.id] = cus
     return cus
   elif isinstance(id, stripe.Customer):
@@ -30,15 +30,15 @@ def getCustomerName(customer):
 tax_ids_cached = {}
 
 def getCustomerTaxId(customer):
-  if customer.id in tax_ids_cached:
-    return tax_ids_cached[customer.id]
   if "tax_ids" in customer:
     tax_id = next((tax_id for tax_id in customer.tax_ids.data if tax_id.type == "eu_vat" and tax_id.verification.status == "verified"), None)
     tax_id = tax_id.value if tax_id is not None else None
   else:
+    if customer.id in tax_ids_cached:
+      return tax_ids_cached[customer.id]
     ids = stripe.Customer.list_tax_ids(customer.id, limit=10).data
     tax_id = ids[0].value if len(ids) > 0 else None
-  tax_ids_cached[customer.id] = tax_id
+    tax_ids_cached[customer.id] = tax_id
   return tax_id
 
 country_codes_eu = [
