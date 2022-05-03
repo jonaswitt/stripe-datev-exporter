@@ -1,5 +1,6 @@
 from datetime import datetime
 from . import config, customer
+import os
 
 fields = [
   "Umsatz (ohne Soll/Haben-Kz)",
@@ -133,6 +134,7 @@ def writeRecords(fileName, records, fromTime=None, toTime=None):
     return
   with open(fileName, 'w', encoding="latin1", errors="replace", newline="\r\n") as fp:
     printRecords(fp, records, fromTime=fromTime, toTime=toTime)
+    print("Wrote {} acc. records  to {}".format(str(len(records)).rjust(4, " "), os.path.relpath(fp.name, os.getcwd())))
 
 def printRecords(textFileHandle, records, fromTime=None, toTime=None):
   if fromTime is not None or toTime is not None:

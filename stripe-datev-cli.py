@@ -83,6 +83,7 @@ class StripeDatevCli(object):
 
         with open(os.path.join(overview_dir, "overview-{:04d}-{:02d}.csv".format(year, month)), "w", encoding="utf-8") as fp:
           fp.write(stripe_datev.invoices.to_csv(invoices))
+          print("Wrote {} invoices      to {}".format(str(len(invoices)).rjust(4, " "), os.path.relpath(fp.name, os.getcwd())))
 
         monthly_recognition_dir = os.path.join(out_dir, "monthly_recognition")
         if not os.path.exists(monthly_recognition_dir):
@@ -90,6 +91,7 @@ class StripeDatevCli(object):
 
         with open(os.path.join(monthly_recognition_dir, "monthly_recognition-{}.csv".format(thisMonth)), "w", encoding="utf-8") as fp:
           fp.write(stripe_datev.invoices.to_recognized_month_csv2(revenue_items))
+          print("Wrote {} revenue items to {}".format(str(len(revenue_items)).rjust(4, " "), os.path.relpath(fp.name, os.getcwd())))
 
         datevDir = os.path.join(out_dir, 'datev')
         if not os.path.exists(datevDir):
