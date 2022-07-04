@@ -126,7 +126,13 @@ def createRevenueItems(invs):
 
     finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(config.accounting_tz)
 
-    invoice_discount = decimal.Decimal(((invoice.get("discount", None) or {}).get("coupon", None) or {}).get("percent_off", 0))
+    invoice_discount = decimal.Decimal(0)
+    coupon = (invoice.get("discount", None) or {}).get("coupon", None)
+    if coupon is not None:
+      if coupon.get("percent_off", None):
+        invoice_discount = decimal.Decimal(coupon["percent_off"])
+      elif coupon.get("amount_off", None):
+        invoice_discount = decimal.Decimal(coupon["amount_off"]) / 100 / amount_net * 100
     line_item_discount_factor = (1 - invoice_discount / 100)
 
     if invoice.lines.has_more:
