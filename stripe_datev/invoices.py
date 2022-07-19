@@ -94,8 +94,11 @@ def createRevenueItems(invs):
   revenue_items = []
   for invoice in invs:
     voided_at = None
+    marked_uncollectible_at = None
     if invoice.status == "void":
       voided_at = datetime.fromtimestamp(invoice.status_transitions.voided_at, timezone.utc).astimezone(config.accounting_tz)
+    elif invoice.status == "uncollectible":
+      marked_uncollectible_at = datetime.fromtimestamp(invoice.status_transitions.marked_uncollectible_at, timezone.utc).astimezone(config.accounting_tz)
 
     credited_at = None
     credited_amount = None
@@ -177,7 +180,8 @@ def createRevenueItems(invs):
       "voided_at": voided_at,
       "credited_at": credited_at,
       "credited_amount": credited_amount,
-      "line_items": line_items if voided_at is None else [],
+      "marked_uncollectible_at": marked_uncollectible_at,
+      "line_items": line_items if voided_at is None and marked_uncollectible_at is None else [],
     })
 
   return revenue_items
@@ -191,6 +195,7 @@ def createAccountingRecords(revenue_item):
   voided_at = revenue_item.get("voided_at", None)
   credited_at = revenue_item.get("credited_at", None)
   credited_amount = revenue_item.get("credited_amount", None)
+  marked_uncollectible_at = revenue_item.get("marked_uncollectible_at", None)
   number = revenue_item["number"]
   eu_vat_id = accounting_props["vat_id"] or ""
 
@@ -224,7 +229,22 @@ def createAccountingRecords(revenue_item):
       "EU-Land u. UStID": eu_vat_id,
     })
 
-  if credited_at is not None:
+  elif marked_uncollectible_at is not None:
+    print("Uncollectible", text, "Created", created, 'Marked uncollectible', marked_uncollectible_at)
+    records.append({
+      "date": marked_uncollectible_at,
+      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(amount_with_tax),
+      "Soll/Haben-Kennzeichen": "S",
+      "WKZ Umsatz": "EUR",
+      "Konto": accounting_props["revenue_account"],
+      "Gegenkonto (ohne BU-Schlüssel)": accounting_props["customer_account"],
+      "BU-Schlüssel": accounting_props["datev_tax_key"],
+      "Buchungstext": "Storno {}".format(text),
+      "Belegfeld 1": number,
+      "EU-Land u. UStID": eu_vat_id,
+    })
+
+  elif credited_at is not None:
     print("Refunded", text, "Created", created, 'Refunded', credited_at)
     records.append({
       "date": credited_at,
