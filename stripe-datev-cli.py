@@ -1,4 +1,5 @@
 import decimal
+from functools import reduce
 import sys
 import argparse
 from datetime import datetime, timedelta, timezone
@@ -192,6 +193,7 @@ class StripeDatevCli(object):
         expand=["data.customer"]
       ).auto_paging_iter()
 
+      totals = []
       for invoice in invoices:
         if invoice.status_transitions.get("marked_uncollectible_at", None) or invoice.status_transitions.get("voided_at", None):
           continue
@@ -199,7 +201,12 @@ class StripeDatevCli(object):
         paid_at = invoice.status_transitions.get("paid_at", None)
         customer = stripe_datev.customer.retrieveCustomer(invoice.customer)
         if not paid_at or stripe_datev.config.accounting_tz.localize(datetime.utcfromtimestamp(paid_at)) > eoy:
-          print(invoice.number, format(decimal.Decimal(invoice.total) / 100, ".2f").rjust(10, " "), "EUR", customer.email.ljust(35, " "), "due", due_date.date(), "({} overdue)".format(eoy - due_date) if due_date < eoy else "")
+          total = decimal.Decimal(invoice.total) / 100
+          totals.append(total)
+          print(invoice.number.ljust(13, " "), format(total, ",.2f").rjust(10, " "), "EUR", customer.email.ljust(35, " "), "due", due_date.date(), "({} overdue)".format(eoy - due_date) if due_date < eoy else "")
+
+      total = reduce(lambda x, y: x + y, totals, decimal.Decimal(0))
+      print("TOTAL        ", format(total, ",.2f").rjust(10, " "), "EUR")
 
 if __name__ == '__main__':
     StripeDatevCli().run(sys.argv)
