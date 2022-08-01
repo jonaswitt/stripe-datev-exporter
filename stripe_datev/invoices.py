@@ -2,7 +2,7 @@ import json
 from stripe_datev import recognition, csv
 import stripe
 import decimal, math
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from . import customer, output, dateparser, config
 import datedelta
 
@@ -138,6 +138,8 @@ def createRevenueItems(invs):
         invoice_discount = decimal.Decimal(coupon["amount_off"]) / 100 / amount_net * 100
     line_item_discount_factor = (1 - invoice_discount / 100)
 
+    is_subscription = invoice.get("subscription", None) is not None
+
     if invoice.lines.has_more:
       lines = invoice.lines.list().auto_paging_iter()
     else:
@@ -182,6 +184,7 @@ def createRevenueItems(invs):
       "credited_amount": credited_amount,
       "marked_uncollectible_at": marked_uncollectible_at,
       "line_items": line_items if voided_at is None and marked_uncollectible_at is None else [],
+      "is_subscription": is_subscription,
     })
 
   return revenue_items
@@ -376,12 +379,21 @@ def to_recognized_month_csv2(revenue_items):
     "country",
 
     "accounting_date",
+    "revenue_type",
+    "is_recurring",
   ]]
 
   for revenue_item in revenue_items:
     voided_at = revenue_item.get("voided_at", None)
     if voided_at is not None:
       continue
+
+    last_line_item_recognition_end = max((line_item["recognition_end"] for line_item in revenue_item["line_items"]), default=None)
+    if last_line_item_recognition_end is not None and revenue_item["created"] + timedelta(days=1) < last_line_item_recognition_end:
+      revenue_type = "Prepaid"
+    else:
+      revenue_type = "PayPerUse"
+    is_recurring = revenue_item.get("is_subscription", False)
 
     for line_item in revenue_item["line_items"]:
       for month in recognition.split_months(line_item["recognition_start"], line_item["recognition_end"], [line_item["amount_net"]]):
@@ -404,6 +416,8 @@ def to_recognized_month_csv2(revenue_items):
           revenue_item["customer"].get("address", {}).get("country", ""),
 
           accounting_date.strftime("%Y-%m-%d"),
+          revenue_type,
+          "true" if is_recurring else "false",
         ])
 
   return csv.lines_to_csv(lines)
