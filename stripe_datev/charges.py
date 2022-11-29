@@ -95,6 +95,7 @@ def createRevenueItems(charges):
       "customer": cus,
       "amount_with_tax": charge_amount,
       "tax_percentage": tax_percentage,
+      "text": text,
       "line_items": [{
         "recognition_start": start,
         "recognition_end": end,
