@@ -60,6 +60,9 @@ def createRevenueItems(charges):
         continue
       else:
         raise NotImplementedError("Handling of partially refunded charges is not implemented yet")
+    if "in_" in charge.description:
+      print("Skipping charge referencing invoice", charge.id, charge.description)
+      continue
 
     cus = customer.retrieveCustomer(charge.customer)
     session = getCheckoutSessionViaPaymentIntentCached(charge.payment_intent)
