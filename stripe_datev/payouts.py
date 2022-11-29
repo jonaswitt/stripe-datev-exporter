@@ -69,3 +69,22 @@ def createAccountingRecords(payouts):
     }
     records.append(record)
   return records
+
+def createAccountingRecordsContributions(balance_transactions):
+  records = []
+  for balance_transaction in balance_transactions:
+    record = {
+      "date": datetime.fromtimestamp(balance_transaction["created"], timezone.utc),
+      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(-decimal.Decimal(balance_transaction["amount"]) / 100),
+      "Soll/Haben-Kennzeichen": "S",
+      "WKZ Umsatz": "EUR",
+      "Konto": "4600",
+      "Gegenkonto (ohne BU-Schlüssel)": "1201",
+      # "BU-Schlüssel": "0",
+      # "Belegdatum": output.formatDateDatev(payout["arrival_date"]),
+      # "Belegfeld 1": payout["id"],
+      "Buchungstext": "Stripe {} {}".format(balance_transaction["description"] or "Contribution", balance_transaction["id"]),
+    }
+    records.append(record)
+  return records
+

@@ -129,6 +129,18 @@ class StripeDatevCli(object):
         payout_records = stripe_datev.payouts.createAccountingRecords(payoutObjects)
         stripe_datev.output.writeRecords(os.path.join(datevDir, "EXTF_{}_Payouts.csv".format(thisMonth)), payout_records)
 
+        balance_transactions = list(stripe.BalanceTransaction.list(
+          created={
+            "lt": int(toTime.timestamp()),
+            "gte": int(fromTime.timestamp()),
+          },
+          type="contribution",
+        ).auto_paging_iter())
+        print("Retrieved {} contribution(s), total {} EUR".format(len(balance_transactions), sum([-decimal.Decimal(b["amount"]) / 100 for b in balance_transactions])))
+
+        contribution_records = stripe_datev.payouts.createAccountingRecordsContributions(balance_transactions)
+        stripe_datev.output.writeRecords(os.path.join(datevDir, "EXTF_{}_Contributions.csv".format(thisMonth)), contribution_records)
+
         # PDF
 
         pdfDir = os.path.join(out_dir, 'pdf')
