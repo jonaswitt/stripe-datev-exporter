@@ -157,8 +157,8 @@ def printRecords(textFileHandle, records, fromTime=None, toTime=None):
     'BH', # Herkunft
     '', # exportiert von
     '', # importiert von
-    '1', # Beraternummer
-    '1', # Mandantennummer
+    str(config.berater_nr), # Beraternummer
+    str(config.mandenten_nr), # Mandantennummer
     minTime.astimezone(config.accounting_tz).strftime('%Y') + '0101', # Wirtschaftsjahresbeginn
     '4', # Sachkontenlänge
     minTime.astimezone(config.accounting_tz).strftime('%Y%m%d'), # Datum Beginn Buchungsstapel
@@ -227,8 +227,8 @@ def printAccounts(textFileHandle, customers):
     'BH', # Herkunft
     '', # exportiert von
     '', # importiert von
-    '1', # Beraternummer
-    '1', # Mandantennummer
+    str(config.berater_nr), # Beraternummer
+    str(config.mandenten_nr), # Mandantennummer
     datetime.today().astimezone(config.accounting_tz).strftime('%Y') + '0101', # Wirtschaftsjahresbeginn
     '4', # Sachkontenlänge
     '', # Datum Beginn Buchungsstapel
