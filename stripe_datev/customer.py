@@ -207,6 +207,10 @@ def fill_account_numbers():
 
     print(customer.id, highest_account_number)
 
-def list_account_numbers():
+def list_account_numbers(file_path):
   customer_it = stripe.Customer.list(expand=["data.tax_ids"]).auto_paging_iter()
-  output.printAccounts(sys.stdout, customer_it)
+  if file_path is None:
+    output.printAccounts(sys.stdout, customer_it)
+  else:
+    with open(file_path, "w", encoding="latin-1", errors="replace") as fp:
+      output.printAccounts(fp, customer_it)

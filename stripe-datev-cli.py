@@ -189,7 +189,7 @@ class StripeDatevCli(object):
       stripe_datev.customer.fill_account_numbers()
 
     def list_accounts(self, argv):
-      stripe_datev.customer.list_account_numbers()
+      stripe_datev.customer.list_account_numbers(argv[0] if len(argv) > 0 else None)
 
     def opos(self, argv):
       eoy = stripe_datev.config.accounting_tz.localize(datetime.now())
