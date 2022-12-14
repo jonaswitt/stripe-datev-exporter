@@ -130,7 +130,7 @@ def createRevenueItems(invs):
       if coupon.get("percent_off", None):
         invoice_discount = decimal.Decimal(coupon["percent_off"])
       elif coupon.get("amount_off", None):
-        invoice_discount = decimal.Decimal(coupon["amount_off"]) / 100 / amount_net * 100
+        invoice_discount = decimal.Decimal(coupon["amount_off"]) / 100 / (decimal.Decimal(invoice.subtotal_excluding_tax) / 100) * 100
 
     is_subscription = invoice.get("subscription", None) is not None
 
