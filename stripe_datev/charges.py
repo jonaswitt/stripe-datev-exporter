@@ -155,11 +155,12 @@ def createAccountingRecords(charges):
       records.append({
         "date": refund_created,
         "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(decimal.Decimal(refund.amount) / 100),
-        "Soll/Haben-Kennzeichen": "S",
+        "Soll/Haben-Kennzeichen": "H",
         "WKZ Umsatz": "EUR",
-        "Konto": acc_props["customer_account"],
-        "Gegenkonto (ohne BU-Schlüssel)": "1201",
+        "Konto": "1201",
+        "Gegenkonto (ohne BU-Schlüssel)": acc_props["customer_account"],
         "Buchungstext": "Stripe Payment Refund ({})".format(charge.id),
+        # "Belegfeld 1": number,
       })
 
   return records

@@ -230,13 +230,13 @@ def createAccountingRecords(revenue_item):
     records.append({
       "date": voided_at,
       "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(amount_with_tax),
-      "Soll/Haben-Kennzeichen": "S",
+      "Soll/Haben-Kennzeichen": "H",
       "WKZ Umsatz": "EUR",
-      "Konto": accounting_props["revenue_account"],
-      "Gegenkonto (ohne BU-Schlüssel)": accounting_props["customer_account"],
+      "Konto": accounting_props["customer_account"],
+      "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
       "BU-Schlüssel": accounting_props["datev_tax_key"],
       "Buchungstext": "Storno {}".format(text),
-      "Belegfeld 1": number,
+      # "Belegfeld 1": number,
       "EU-Land u. UStID": eu_vat_id,
     })
 
@@ -245,13 +245,13 @@ def createAccountingRecords(revenue_item):
     records.append({
       "date": marked_uncollectible_at,
       "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(amount_with_tax),
-      "Soll/Haben-Kennzeichen": "S",
+      "Soll/Haben-Kennzeichen": "H",
       "WKZ Umsatz": "EUR",
-      "Konto": accounting_props["revenue_account"],
-      "Gegenkonto (ohne BU-Schlüssel)": accounting_props["customer_account"],
+      "Konto": accounting_props["customer_account"],
+      "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
       "BU-Schlüssel": accounting_props["datev_tax_key"],
       "Buchungstext": "Storno {}".format(text),
-      "Belegfeld 1": number,
+      # "Belegfeld 1": number,
       "EU-Land u. UStID": eu_vat_id,
     })
 
@@ -260,13 +260,13 @@ def createAccountingRecords(revenue_item):
     records.append({
       "date": credited_at,
       "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(credited_amount),
-      "Soll/Haben-Kennzeichen": "S",
+      "Soll/Haben-Kennzeichen": "H",
       "WKZ Umsatz": "EUR",
-      "Konto": accounting_props["revenue_account"],
-      "Gegenkonto (ohne BU-Schlüssel)": accounting_props["customer_account"],
+      "Konto": accounting_props["customer_account"],
+      "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
       "BU-Schlüssel": accounting_props["datev_tax_key"],
       "Buchungstext": "Erstattung {}".format(text),
-      "Belegfeld 1": number,
+      # "Belegfeld 1": number,
       "EU-Land u. UStID": eu_vat_id,
     })
 
