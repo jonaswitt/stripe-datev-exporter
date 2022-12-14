@@ -102,13 +102,11 @@ def createRevenueItems(invs):
 
     credited_at = None
     credited_amount = None
-    invoice_discount_factor = 1
     if invoice.post_payment_credit_notes_amount > 0:
       cns = stripe.CreditNote.list(invoice=invoice.id).data
       assert len(cns) == 1
       credited_at = datetime.fromtimestamp(cns[0].created, timezone.utc).astimezone(config.accounting_tz)
       credited_amount = decimal.Decimal(invoice.post_payment_credit_notes_amount) / 100
-      invoice_discount_factor = 1 - (decimal.Decimal(invoice.post_payment_credit_notes_amount) / decimal.Decimal(invoice.total))
 
     line_items = []
 
@@ -123,9 +121,6 @@ def createRevenueItems(invs):
     if len(invoice.total_tax_amounts) > 0:
       rate = retrieveTaxRate(invoice.total_tax_amounts[0]["tax_rate"])
       tax_percentage = decimal.Decimal(rate["percentage"])
-    # Do not apply invoice_discount_factor to net/with tax invoice
-    # amounts (for DATEV, we create refund bookings), only
-    # to line items (below) for revenue recognition
 
     finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(config.accounting_tz)
 
@@ -164,9 +159,9 @@ def createRevenueItems(invs):
         "line_item_idx": line_item_idx,
         "recognition_start": start,
         "recognition_end": end,
-        "amount_net": discounted_li_net * invoice_discount_factor,
+        "amount_net": discounted_li_net,
         "text": text,
-        "amount_with_tax": discounted_li_total * invoice_discount_factor
+        "amount_with_tax": discounted_li_total
       })
 
     revenue_items.append({
@@ -183,7 +178,7 @@ def createRevenueItems(invs):
       "credited_at": credited_at,
       "credited_amount": credited_amount,
       "marked_uncollectible_at": marked_uncollectible_at,
-      "line_items": line_items if voided_at is None and marked_uncollectible_at is None else [],
+      "line_items": line_items,
       "is_subscription": is_subscription,
     })
 
@@ -384,9 +379,11 @@ def to_recognized_month_csv2(revenue_items):
   ]]
 
   for revenue_item in revenue_items:
+    amount_with_tax = revenue_item.get("amount_with_tax")
     voided_at = revenue_item.get("voided_at", None)
-    if voided_at is not None:
-      continue
+    credited_at = revenue_item.get("credited_at", None)
+    credited_amount = revenue_item.get("credited_amount", None)
+    marked_uncollectible_at = revenue_item.get("marked_uncollectible_at", None)
 
     last_line_item_recognition_end = max((line_item["recognition_end"] for line_item in revenue_item["line_items"]), default=None)
     if last_line_item_recognition_end is not None and revenue_item["created"] + timedelta(days=1) < last_line_item_recognition_end:
@@ -419,6 +416,25 @@ def to_recognized_month_csv2(revenue_items):
           revenue_type,
           "true" if is_recurring else "false",
         ])
+
+        if voided_at is not None:
+          reverse = lines[-1].copy()
+          reverse[8] = "-" + reverse[8]
+          reverse[12] = voided_at.strftime("%Y-%m-%d")
+          lines.append(reverse)
+
+        elif marked_uncollectible_at is not None:
+          reverse = lines[-1].copy()
+          reverse[8] = "-" + reverse[8]
+          reverse[12] = marked_uncollectible_at.strftime("%Y-%m-%d")
+          lines.append(reverse)
+
+        elif credited_at is not None:
+          reverse = lines[-1].copy()
+          reverse[8] = format(month["amounts"][0] * -1 * (credited_amount / amount_with_tax), ".2f")
+          reverse[12] = credited_at.strftime("%Y-%m-%d")
+          lines.append(reverse)
+
 
   return csv.lines_to_csv(lines)
 
