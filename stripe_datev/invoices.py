@@ -285,7 +285,7 @@ def createAccountingRecords(revenue_item):
         "WKZ Umsatz": "EUR",
         "Konto": accounting_props["revenue_account"],
         "Gegenkonto (ohne BU-Schlüssel)": "990",
-        "Buchungstext": "{} / pRAP nach {}".format(text, "{}..{}".format(forward_months[0]["start"].strftime("%Y-%m"), forward_months[-1]["start"].strftime("%Y-%m")) if len(forward_months) > 1 else forward_months[0]["start"].strftime("%Y-%m")),
+        "Buchungstext": "pRAP nach {} / {}".format("{}..{}".format(forward_months[0]["start"].strftime("%Y-%m"), forward_months[-1]["start"].strftime("%Y-%m")) if len(forward_months) > 1 else forward_months[0]["start"].strftime("%Y-%m"), text),
         "EU-Land u. UStID": eu_vat_id,
       })
 
@@ -297,7 +297,7 @@ def createAccountingRecords(revenue_item):
           "WKZ Umsatz": "EUR",
           "Konto": "990",
           "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
-          "Buchungstext": "{} / pRAP aus {}".format(text, created.strftime("%Y-%m")),
+          "Buchungstext": "pRAP aus {} / {}".format(created.strftime("%Y-%m"), text),
           "EU-Land u. UStID": eu_vat_id,
         })
 
