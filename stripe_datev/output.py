@@ -255,7 +255,7 @@ def printAccounts(textFileHandle, customers):
       "Name (Adressattyp Unternehmen)": customer.getCustomerName(cus),
       "Adressattyp": "2",
       "EU-Land": vat_id[:2] if vat_id is not None else "",
-      "EU-UStID": vat_id if vat_id is not None else "",
+      "EU-UStID": vat_id[2:] if vat_id is not None else "",
       "Straße": cus.address.line1 or "",
       "Adresszusatz": cus.address.line2 or "",
       "Postleitzahl": cus.address.postal_code or "",
