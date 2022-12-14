@@ -138,7 +138,7 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
     else:
       props["revenue_account"] = "8338"
 
-    # props["datev_tax_key"] = "94"
+    props["datev_tax_key"] = "40"
     return props
 
   elif tax_exempt == "none":
