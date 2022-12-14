@@ -93,6 +93,10 @@ def getLineItemRecognitionRange(line_item, invoice):
 def createRevenueItems(invs):
   revenue_items = []
   for invoice in invs:
+    if invoice["metadata"].get("stripe-datev-exporter:ignore", "false") == "true":
+      print("Skipping invoice {} (ignore)".format(invoice.id))
+      continue
+
     voided_at = None
     marked_uncollectible_at = None
     if invoice.status == "void":
