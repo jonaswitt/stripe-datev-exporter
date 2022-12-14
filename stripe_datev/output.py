@@ -151,7 +151,7 @@ def printRecords(textFileHandle, records, fromTime=None, toTime=None):
     '700', # Version des DATEV-Formats (141 bedeutet 1.41)
     '21', # Datenkategorie (21 = Buchungsstapel, 67 = Buchungstextkonstanten, 16 = Debitoren/Kreditoren, 20 = Kontenbeschriftungen usw.)
     'Buchungsstapel', # Formatname (Buchungsstapel, Buchungstextkonstanten, Debitoren/Kreditoren, Kontenbeschriftungen usw.)
-    '9', # Formatversion (bezogen auf Formatname)
+    '5', # Formatversion (bezogen auf Formatname)
     datetime.today().astimezone(config.accounting_tz).strftime("%Y%m%d%H%M%S"), # '20190211202957107', # erzeugt am
     '', # importiert am
     'BH', # Herkunft
@@ -221,7 +221,7 @@ def printAccounts(textFileHandle, customers):
     '700', # Version des DATEV-Formats (141 bedeutet 1.41)
     '16', # Datenkategorie (21 = Buchungsstapel, 67 = Buchungstextkonstanten, 16 = Debitoren/Kreditoren, 20 = Kontenbeschriftungen usw.)
     'Debitoren/Kreditoren', # Formatname (Buchungsstapel, Buchungstextkonstanten, Debitoren/Kreditoren, Kontenbeschriftungen usw.)
-    '9', # Formatversion (bezogen auf Formatname)
+    '5', # Formatversion (bezogen auf Formatname)
     datetime.today().astimezone(config.accounting_tz).strftime("%Y%m%d%H%M%S"), # '20190211202957107', # erzeugt am
     '', # importiert am
     'BH', # Herkunft
