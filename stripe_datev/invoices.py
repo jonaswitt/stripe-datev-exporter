@@ -131,12 +131,11 @@ def createRevenueItems(invs):
         invoice_discount = decimal.Decimal(coupon["percent_off"])
       elif coupon.get("amount_off", None):
         invoice_discount = decimal.Decimal(coupon["amount_off"]) / 100 / amount_net * 100
-    line_item_discount_factor = (1 - invoice_discount / 100)
 
     is_subscription = invoice.get("subscription", None) is not None
 
-    if invoice.lines.has_more:
-      lines = invoice.lines.list().auto_paging_iter()
+    if invoice.lines.has_more or any(len(li.get("discounts", [])) > 0 for li in invoice.lines):
+      lines = invoice.lines.list(expand=["data.discounts"]).auto_paging_iter()
     else:
       lines = invoice.lines
 
@@ -145,6 +144,16 @@ def createRevenueItems(invs):
       start, end = getLineItemRecognitionRange(line_item, invoice)
 
       li_amount = decimal.Decimal(line_item["amount"]) / 100
+      line_item_discount = decimal.Decimal(0)
+      coupon = line_item["discounts"][0].get("coupon", None) if len(line_item["discounts"]) > 0 else None
+      if coupon is not None:
+        if coupon.get("percent_off", None):
+          line_item_discount = decimal.Decimal(coupon["percent_off"])
+        elif coupon.get("amount_off", None):
+          line_item_discount = decimal.Decimal(coupon["amount_off"]) / 100 / li_amount * 100
+      # TODO: combine line item and invoice discounts?
+      line_item_discount_factor = (1 - invoice_discount / 100) * (1 - line_item_discount / 100)
+
       discounted_li_net = li_amount * line_item_discount_factor
       discounted_li_total = discounted_li_net
       if len(line_item["tax_amounts"]) > 0:
