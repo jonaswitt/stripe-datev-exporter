@@ -218,7 +218,7 @@ class StripeDatevCli(object):
 
       totals = []
       for invoice in invoices:
-        if invoice.status_transitions.get("marked_uncollectible_at", None) or invoice.status_transitions.get("voided_at", None):
+        if invoice.status_transitions.get("marked_uncollectible_at", None) or invoice.status_transitions.get("voided_at", None) or invoice.status == "draft":
           continue
         due_date = stripe_datev.config.accounting_tz.localize(datetime.utcfromtimestamp(invoice.due_date if invoice.due_date else invoice.created))
         paid_at = invoice.status_transitions.get("paid_at", None)
