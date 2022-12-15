@@ -75,7 +75,7 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
     "vat_region": "World",
   }
 
-  if (invoice is None or datetime.fromtimestamp(invoice.created, timezone.utc) >= datetime(2022, 1, 1, 0, 0).astimezone(config.accounting_tz)):
+  if (invoice is None or datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc) >= datetime(2022, 1, 1, 0, 0).astimezone(config.accounting_tz)):
     if not customer.metadata.get("accountNumber", None):
       raise Exception("Expected 'accountNumber' in metadata")
     props["customer_account"] = customer.metadata["accountNumber"]
