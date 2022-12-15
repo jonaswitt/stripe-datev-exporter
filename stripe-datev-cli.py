@@ -114,7 +114,7 @@ class StripeDatevCli(object):
             name = "EXTF_{}_Revenue.csv".format(thisMonth)
           else:
             name = "EXTF_{}_Revenue_From_{}.csv".format(month, thisMonth)
-          stripe_datev.output.writeRecords(os.path.join(datevDir, name), records)
+          stripe_datev.output.writeRecords(os.path.join(datevDir, name), records, bezeichung="Stripe Revenue {} from {}".format(month, thisMonth))
 
         # Datev charges
 
@@ -130,7 +130,7 @@ class StripeDatevCli(object):
             name = "EXTF_{}_Charges.csv".format(thisMonth)
           else:
             name = "EXTF_{}_Charges_From_{}.csv".format(month, thisMonth)
-          stripe_datev.output.writeRecords(os.path.join(datevDir, name), records)
+          stripe_datev.output.writeRecords(os.path.join(datevDir, name), records, bezeichung="Stripe Charges/Fees {} from {}".format(month, thisMonth))
 
         # Datev payouts
 
@@ -138,7 +138,7 @@ class StripeDatevCli(object):
         print("Retrieved {} payout(s), total {} EUR".format(len(payoutObjects), sum([r["amount"] for r in payoutObjects])))
 
         payout_records = stripe_datev.payouts.createAccountingRecords(payoutObjects)
-        stripe_datev.output.writeRecords(os.path.join(datevDir, "EXTF_{}_Payouts.csv".format(thisMonth)), payout_records)
+        stripe_datev.output.writeRecords(os.path.join(datevDir, "EXTF_{}_Payouts.csv".format(thisMonth)), payout_records, bezeichung="Stripe Payouts {}".format(thisMonth))
 
         balance_transactions = list(stripe.BalanceTransaction.list(
           created={
@@ -150,7 +150,7 @@ class StripeDatevCli(object):
         print("Retrieved {} contribution(s), total {} EUR".format(len(balance_transactions), sum([-decimal.Decimal(b["amount"]) / 100 for b in balance_transactions])))
 
         contribution_records = stripe_datev.payouts.createAccountingRecordsContributions(balance_transactions)
-        stripe_datev.output.writeRecords(os.path.join(datevDir, "EXTF_{}_Contributions.csv".format(thisMonth)), contribution_records)
+        stripe_datev.output.writeRecords(os.path.join(datevDir, "EXTF_{}_Contributions.csv".format(thisMonth)), contribution_records, bezeichung="Stripe Contributions {}".format(thisMonth))
 
         # PDF
 

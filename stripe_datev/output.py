@@ -129,14 +129,14 @@ fields = [
 def filterRecords(records, fromTime=None, toTime=None):
   return list(filter(lambda r: (fromTime is None or r["date"] >= fromTime) and (toTime is None or r["date"] <= toTime), records))
 
-def writeRecords(fileName, records, fromTime=None, toTime=None):
+def writeRecords(fileName, records, fromTime=None, toTime=None, bezeichung=None):
   if len(records) == 0:
     return
   with open(fileName, 'w', encoding="latin1", errors="replace", newline="\r\n") as fp:
-    printRecords(fp, records, fromTime=fromTime, toTime=toTime)
+    printRecords(fp, records, fromTime=fromTime, toTime=toTime, bezeichung=bezeichung)
     print("Wrote {} acc. records  to {}".format(str(len(records)).rjust(4, " "), os.path.relpath(fp.name, os.getcwd())))
 
-def printRecords(textFileHandle, records, fromTime=None, toTime=None):
+def printRecords(textFileHandle, records, fromTime=None, toTime=None, bezeichung=None):
   if fromTime is not None or toTime is not None:
     records = filterRecords(records, fromTime, toTime)
 
@@ -163,7 +163,7 @@ def printRecords(textFileHandle, records, fromTime=None, toTime=None):
     '4', # Sachkontenlänge
     minTime.astimezone(config.accounting_tz).strftime('%Y%m%d'), # Datum Beginn Buchungsstapel
     maxTime.astimezone(config.accounting_tz).strftime('%Y%m%d'), # Datum Ende Buchungsstapel
-    '', # Bezeichnung (Vorlaufname, z. B. Buchungsstapel)
+    '"{}"'.format(bezeichung) if bezeichung else "", # Bezeichnung (Vorlaufname, z. B. Buchungsstapel)
     '', # Diktatkürzel
     '1', # Buchungstyp (bei Buchungsstapel = 1)
     '0', # Rechnungslegungszweck
