@@ -212,63 +212,64 @@ def createAccountingRecords(revenue_item):
 
   records = []
 
-  records.append({
-    "date": created,
-    "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(amount_with_tax),
-    "Soll/Haben-Kennzeichen": "S",
-    "WKZ Umsatz": "EUR",
-    "Konto": accounting_props["customer_account"],
-    "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
-    "BU-Schlüssel": accounting_props["datev_tax_key"],
-    "Buchungstext": text,
-    "Belegfeld 1": number,
-    "EU-Land u. UStID": eu_vat_id,
-  })
-
-  if voided_at is not None:
-    print("Voided", text, "Created", created, 'Voided', voided_at)
+  if amount_with_tax > 0:
     records.append({
-      "date": voided_at,
+      "date": created,
       "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(amount_with_tax),
-      "Soll/Haben-Kennzeichen": "H",
+      "Soll/Haben-Kennzeichen": "S",
       "WKZ Umsatz": "EUR",
       "Konto": accounting_props["customer_account"],
       "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
       "BU-Schlüssel": accounting_props["datev_tax_key"],
-      "Buchungstext": "Storno {}".format(text),
-      # "Belegfeld 1": number,
+      "Buchungstext": text,
+      "Belegfeld 1": number,
       "EU-Land u. UStID": eu_vat_id,
     })
 
-  elif marked_uncollectible_at is not None:
-    print("Uncollectible", text, "Created", created, 'Marked uncollectible', marked_uncollectible_at)
-    records.append({
-      "date": marked_uncollectible_at,
-      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(amount_with_tax),
-      "Soll/Haben-Kennzeichen": "H",
-      "WKZ Umsatz": "EUR",
-      "Konto": accounting_props["customer_account"],
-      "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
-      "BU-Schlüssel": accounting_props["datev_tax_key"],
-      "Buchungstext": "Storno {}".format(text),
-      # "Belegfeld 1": number,
-      "EU-Land u. UStID": eu_vat_id,
-    })
+    if voided_at is not None:
+      print("Voided", text, "Created", created, 'Voided', voided_at)
+      records.append({
+        "date": voided_at,
+        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(amount_with_tax),
+        "Soll/Haben-Kennzeichen": "H",
+        "WKZ Umsatz": "EUR",
+        "Konto": accounting_props["customer_account"],
+        "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
+        "BU-Schlüssel": accounting_props["datev_tax_key"],
+        "Buchungstext": "Storno {}".format(text),
+        # "Belegfeld 1": number,
+        "EU-Land u. UStID": eu_vat_id,
+      })
 
-  elif credited_at is not None:
-    print("Refunded", text, "Created", created, 'Refunded', credited_at)
-    records.append({
-      "date": credited_at,
-      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(credited_amount),
-      "Soll/Haben-Kennzeichen": "H",
-      "WKZ Umsatz": "EUR",
-      "Konto": accounting_props["customer_account"],
-      "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
-      "BU-Schlüssel": accounting_props["datev_tax_key"],
-      "Buchungstext": "Erstattung {}".format(text),
-      # "Belegfeld 1": number,
-      "EU-Land u. UStID": eu_vat_id,
-    })
+    elif marked_uncollectible_at is not None:
+      print("Uncollectible", text, "Created", created, 'Marked uncollectible', marked_uncollectible_at)
+      records.append({
+        "date": marked_uncollectible_at,
+        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(amount_with_tax),
+        "Soll/Haben-Kennzeichen": "H",
+        "WKZ Umsatz": "EUR",
+        "Konto": accounting_props["customer_account"],
+        "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
+        "BU-Schlüssel": accounting_props["datev_tax_key"],
+        "Buchungstext": "Storno {}".format(text),
+        # "Belegfeld 1": number,
+        "EU-Land u. UStID": eu_vat_id,
+      })
+
+    elif credited_at is not None:
+      print("Refunded", text, "Created", created, 'Refunded', credited_at)
+      records.append({
+        "date": credited_at,
+        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(credited_amount),
+        "Soll/Haben-Kennzeichen": "H",
+        "WKZ Umsatz": "EUR",
+        "Konto": accounting_props["customer_account"],
+        "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
+        "BU-Schlüssel": accounting_props["datev_tax_key"],
+        "Buchungstext": "Erstattung {}".format(text),
+        # "Belegfeld 1": number,
+        "EU-Land u. UStID": eu_vat_id,
+      })
 
   for line_item in line_items:
     amount_with_tax = line_item["amount_with_tax"]
