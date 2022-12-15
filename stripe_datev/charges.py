@@ -112,7 +112,7 @@ def createAccountingRecords(charges):
 
   for charge in charges:
     acc_props = customer.getAccountingProps(customer.retrieveCustomer(charge.customer))
-    created = datetime.fromtimestamp(charge.created, timezone.utc)
+    created = datetime.fromtimestamp(charge.created, timezone.utc).astimezone(config.accounting_tz)
 
     balance_transaction = stripe.BalanceTransaction.retrieve(charge.balance_transaction)
     assert len(balance_transaction.fee_details) == 1
