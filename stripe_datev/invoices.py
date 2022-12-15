@@ -271,6 +271,13 @@ def createAccountingRecords(revenue_item):
         "EU-Land u. UStID": eu_vat_id,
       })
 
+  # If invoice was voided, marked uncollectible or credited fully in same month,
+  # don't bother with pRAP
+  if voided_at is not None and voided_at.strftime("%Y-%m") == created.strftime("%Y-%m") or \
+    marked_uncollectible_at is not None and marked_uncollectible_at.strftime("%Y-%m") == created.strftime("%Y-%m") or \
+    credited_at is not None and credited_at.strftime("%Y-%m") == created.strftime("%Y-%m") and credited_amount == amount_with_tax:
+    return records
+
   for line_item in line_items:
     amount_with_tax = line_item["amount_with_tax"]
     recognition_start = line_item["recognition_start"]
@@ -300,7 +307,8 @@ def createAccountingRecords(revenue_item):
 
       for month in forward_months:
         records.append({
-          "date": month["start"],
+          # If invoice was voided/etc., resolve all pRAP in that month, don't keep going into the future
+          "date": voided_at or marked_uncollectible_at or credited_at or month["start"],
           "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(month["amounts"][0]),
           "Soll/Haben-Kennzeichen": "S",
           "WKZ Umsatz": "EUR",
@@ -407,8 +415,9 @@ def to_recognized_month_csv2(revenue_items):
     is_recurring = revenue_item.get("is_subscription", False)
 
     for line_item in revenue_item["line_items"]:
+      end = voided_at or marked_uncollectible_at or credited_at or line_item["recognition_end"]
       for month in recognition.split_months(line_item["recognition_start"], line_item["recognition_end"], [line_item["amount_net"]]):
-        accounting_date = max(revenue_item["created"], month["start"])
+        accounting_date = max(revenue_item["created"], end if end < month["start"] else month["start"])
 
         lines.append([
           revenue_item["id"],
@@ -433,20 +442,20 @@ def to_recognized_month_csv2(revenue_items):
 
         if voided_at is not None:
           reverse = lines[-1].copy()
-          reverse[8] = "-" + reverse[8]
-          reverse[12] = voided_at.strftime("%Y-%m-%d")
+          reverse[8] = format(month["amounts"][0] * -1, ".2f")
+          reverse[12] = max(revenue_item["created"], end if end < month["end"] else month["start"]).strftime("%Y-%m-%d")
           lines.append(reverse)
 
         elif marked_uncollectible_at is not None:
           reverse = lines[-1].copy()
-          reverse[8] = "-" + reverse[8]
-          reverse[12] = marked_uncollectible_at.strftime("%Y-%m-%d")
+          reverse[8] = format(month["amounts"][0] * -1, ".2f")
+          reverse[12] = max(revenue_item["created"], end if end < month["end"] else month["start"]).strftime("%Y-%m-%d")
           lines.append(reverse)
 
         elif credited_at is not None:
           reverse = lines[-1].copy()
           reverse[8] = format(month["amounts"][0] * -1 * (credited_amount / amount_with_tax), ".2f")
-          reverse[12] = credited_at.strftime("%Y-%m-%d")
+          reverse[12] = max(revenue_item["created"], end if end < month["end"] else month["start"]).strftime("%Y-%m-%d")
           lines.append(reverse)
 
 
