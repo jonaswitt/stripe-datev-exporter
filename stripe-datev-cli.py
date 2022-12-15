@@ -119,7 +119,18 @@ class StripeDatevCli(object):
         # Datev charges
 
         charge_records = stripe_datev.charges.createAccountingRecords(charges)
-        stripe_datev.output.writeRecords(os.path.join(datevDir, "EXTF_{}_Charges.csv".format(thisMonth)), charge_records)
+
+        charges_by_month = {}
+        for record in charge_records:
+          month = record["date"].strftime("%Y-%m")
+          charges_by_month[month] = charges_by_month.get(month, []) + [record]
+
+        for month, records in charges_by_month.items():
+          if month == thisMonth:
+            name = "EXTF_{}_Charges.csv".format(thisMonth)
+          else:
+            name = "EXTF_{}_Charges_From_{}.csv".format(month, thisMonth)
+          stripe_datev.output.writeRecords(os.path.join(datevDir, name), records)
 
         # Datev payouts
 
