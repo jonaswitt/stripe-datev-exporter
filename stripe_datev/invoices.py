@@ -237,7 +237,7 @@ def createAccountingRecords(revenue_item):
         "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
         "BU-Schlüssel": accounting_props["datev_tax_key"],
         "Buchungstext": "Storno {}".format(text),
-        # "Belegfeld 1": number,
+        "Belegfeld 1": number,
         "EU-Land u. UStID": eu_vat_id,
       })
 
@@ -252,7 +252,7 @@ def createAccountingRecords(revenue_item):
         "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
         "BU-Schlüssel": accounting_props["datev_tax_key"],
         "Buchungstext": "Storno {}".format(text),
-        # "Belegfeld 1": number,
+        "Belegfeld 1": number,
         "EU-Land u. UStID": eu_vat_id,
       })
 
@@ -267,7 +267,7 @@ def createAccountingRecords(revenue_item):
         "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
         "BU-Schlüssel": accounting_props["datev_tax_key"],
         "Buchungstext": "Erstattung {}".format(text),
-        # "Belegfeld 1": number,
+        "Belegfeld 1": number,
         "EU-Land u. UStID": eu_vat_id,
       })
 

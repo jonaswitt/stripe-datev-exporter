@@ -160,7 +160,7 @@ def createAccountingRecords(charges):
         "Konto": "1201",
         "Gegenkonto (ohne BU-Schlüssel)": acc_props["customer_account"],
         "Buchungstext": "Stripe Payment Refund ({})".format(charge.id),
-        # "Belegfeld 1": number,
+        "Belegfeld 1": number,
       })
 
   return records
