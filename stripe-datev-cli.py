@@ -203,30 +203,44 @@ class StripeDatevCli(object):
       stripe_datev.customer.list_account_numbers(argv[0] if len(argv) > 0 else None)
 
     def opos(self, argv):
-      eoy = stripe_datev.config.accounting_tz.localize(datetime.now())
-      # eoy = stripe_datev.config.accounting_tz.localize(datetime(2022, 4, 24, 0, 0, 0, 0) - timedelta(seconds=1))
-      print("Unpaid invoices as of", eoy)
+      if len(argv) > 0:
+        ref = datetime(*list(map(int, argv))) + timedelta(days=1) - timedelta(seconds=1)
+        status = None
+      else:
+        ref = datetime.now()
+        status = "open"
+
+      print("Unpaid invoices as of", stripe_datev.config.accounting_tz.localize(ref))
 
       invoices = stripe.Invoice.list(
         created={
-          "lte": int(eoy.timestamp()),
-          "gte": int((eoy - datedelta.YEAR).timestamp()),
+          "lte": int(ref.timestamp()),
+          "gte": int((ref - datedelta.YEAR).timestamp()),
         },
-        status="open", # comment out if 'eoy' is not now()
+        status=status,
         expand=["data.customer"]
       ).auto_paging_iter()
 
       totals = []
       for invoice in invoices:
-        if invoice.status_transitions.get("marked_uncollectible_at", None) or invoice.status_transitions.get("voided_at", None) or invoice.status == "draft":
+        finalized_at = invoice.status_transitions.get("finalized_at", None)
+        if finalized_at is None or datetime.utcfromtimestamp(finalized_at) > ref:
           continue
-        due_date = stripe_datev.config.accounting_tz.localize(datetime.utcfromtimestamp(invoice.due_date if invoice.due_date else invoice.created))
+        marked_uncollectible_at = invoice.status_transitions.get("marked_uncollectible_at", None)
+        if marked_uncollectible_at is not None and datetime.utcfromtimestamp(marked_uncollectible_at) <= ref:
+          continue
+        voided_at = invoice.status_transitions.get("voided_at", None)
+        if voided_at is not None and datetime.utcfromtimestamp(voided_at) <= ref:
+          continue
         paid_at = invoice.status_transitions.get("paid_at", None)
+        if paid_at is not None and datetime.utcfromtimestamp(paid_at) <= ref:
+          continue
+
         customer = stripe_datev.customer.retrieveCustomer(invoice.customer)
-        if not paid_at or stripe_datev.config.accounting_tz.localize(datetime.utcfromtimestamp(paid_at)) > eoy:
-          total = decimal.Decimal(invoice.total) / 100
-          totals.append(total)
-          print(invoice.number.ljust(13, " "), format(total, ",.2f").rjust(10, " "), "EUR", customer.email.ljust(35, " "), "due", due_date.date(), "({} overdue)".format(eoy - due_date) if due_date < eoy else "")
+        due_date = datetime.utcfromtimestamp(invoice.due_date if invoice.due_date else invoice.created)
+        total = decimal.Decimal(invoice.total) / 100
+        totals.append(total)
+        print(invoice.number.ljust(13, " "), format(total, ",.2f").rjust(10, " "), "EUR", customer.email.ljust(35, " "), "due", due_date.date(), "({} overdue)".format(ref - due_date) if due_date < ref else "")
 
       total = reduce(lambda x, y: x + y, totals, decimal.Decimal(0))
       print("TOTAL        ", format(total, ",.2f").rjust(10, " "), "EUR")
