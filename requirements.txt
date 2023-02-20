@@ -1,5 +1,5 @@
 datedelta==1.2
-python-dotenv=0.19.2
+python-dotenv==0.19.2
 pytz==2018.9
 requests==2.21.0
 stripe==2.64.0
