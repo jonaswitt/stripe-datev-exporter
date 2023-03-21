@@ -302,6 +302,7 @@ def createAccountingRecords(revenue_item):
         "Konto": accounting_props["revenue_account"],
         "Gegenkonto (ohne BU-Schlüssel)": "990",
         "Buchungstext": "pRAP nach {} / {}".format("{}..{}".format(forward_months[0]["start"].strftime("%Y-%m"), forward_months[-1]["start"].strftime("%Y-%m")) if len(forward_months) > 1 else forward_months[0]["start"].strftime("%Y-%m"), text),
+        "Belegfeld 1": number,
         "EU-Land u. UStID": eu_vat_id,
       })
 
@@ -315,6 +316,7 @@ def createAccountingRecords(revenue_item):
           "Konto": "990",
           "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
           "Buchungstext": "pRAP aus {} / {}".format(created.strftime("%Y-%m"), text),
+          "Belegfeld 1": number,
           "EU-Land u. UStID": eu_vat_id,
         })
 
