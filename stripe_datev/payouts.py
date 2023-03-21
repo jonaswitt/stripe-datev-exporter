@@ -13,7 +13,8 @@ def listPayouts(fromTime, toTime):
   ).auto_paging_iter()
 
   for payout in payouts:
-    assert payout.status == "paid"
+    if payout.status != "paid":
+      continue
     assert payout.currency == "eur"
     balance_transaction = payout.balance_transaction
     assert len(balance_transaction.fee_details) == 0
