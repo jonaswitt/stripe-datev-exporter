@@ -11,7 +11,8 @@ import stripe_datev.invoices, \
   stripe_datev.payouts, \
   stripe_datev.recognition, \
   stripe_datev.output, \
-  stripe_datev.config
+  stripe_datev.config, \
+  stripe_datev.transfers
 import os, os.path
 import requests
 import dotenv
@@ -131,6 +132,14 @@ class StripeDatevCli(object):
           else:
             name = "EXTF_{}_Charges_From_{}.csv".format(month, thisMonth)
           stripe_datev.output.writeRecords(os.path.join(datevDir, name), records, bezeichung="Stripe Charges/Fees {} from {}".format(month, thisMonth))
+
+        # Datev transfers
+
+        transfers = list(stripe_datev.transfers.listTransfersRaw(fromTime, toTime))
+        print("Retrieved {} transfer(s), total {} EUR".format(len(transfers), sum([decimal.Decimal(c.amount) / 100 for c in transfers])))
+
+        transfer_records = stripe_datev.transfers.createAccountingRecords(transfers)
+        stripe_datev.output.writeRecords(os.path.join(datevDir, "EXTF_{}_Transfers.csv".format(thisMonth)), transfer_records, bezeichung="Stripe Transfers {}".format(thisMonth))
 
         # Datev payouts
 
