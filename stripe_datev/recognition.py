@@ -39,7 +39,7 @@ def split_months(start, end, amounts):
 
   months[-1]["amounts"] = [month_amount + remaining_amounts[idx] for idx, month_amount in enumerate(months[-1]["amounts"])]
 
-  if not any(amount > 0 for amount in months[-1]["amounts"]):
+  if not any(amount != 0 for amount in months[-1]["amounts"]):
     months = months[:-1]
 
   for idx, amount in enumerate(amounts):
