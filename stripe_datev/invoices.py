@@ -1,12 +1,17 @@
+import decimal
 import json
-from stripe_datev import recognition, csv
-import stripe
-import decimal, math
+import math
 from datetime import datetime, timedelta, timezone
-from . import customer, output, dateparser, config
+
 import datedelta
+import stripe
+
+from stripe_datev import csv, recognition
+
+from . import config, customer, dateparser, output
 
 invoices_cached = {}
+
 
 def listFinalizedInvoices(fromTime, toTime):
   invoices = stripe.Invoice.list(
@@ -22,18 +27,21 @@ def listFinalizedInvoices(fromTime, toTime):
   for invoice in invoices:
     if invoice.status == "draft":
       continue
-    finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(config.accounting_tz)
+    finalized_date = datetime.fromtimestamp(
+      invoice.status_transitions.finalized_at, timezone.utc).astimezone(config.accounting_tz)
     if finalized_date < fromTime or finalized_date >= toTime:
       # print("Skipping invoice {}, created {} finalized {} due {}".format(invoice.id, created_date, finalized_date, due_date))
       continue
     invoices_cached[invoice.id] = invoice
     yield invoice
 
+
 def retrieveInvoice(id):
   if isinstance(id, str):
     if id in invoices_cached:
       return invoices_cached[id]
-    invoice = stripe.Invoice.retrieve(id, expand=["customer", "customer.tax_ids"])
+    invoice = stripe.Invoice.retrieve(
+      id, expand=["customer", "customer.tax_ids"])
     invoices_cached[invoice.id] = invoice
     return invoice
   elif isinstance(id, stripe.Invoice):
@@ -42,7 +50,9 @@ def retrieveInvoice(id):
   else:
     raise Exception("Unexpected retrieveInvoice() argument: {}".format(id))
 
+
 tax_rates_cached = {}
+
 
 def retrieveTaxRate(id):
   if id in tax_rates_cached:
@@ -50,6 +60,7 @@ def retrieveTaxRate(id):
   tax_rate = stripe.TaxRate.retrieve(id)
   tax_rates_cached[id] = tax_rate
   return tax_rate
+
 
 def getLineItemRecognitionRange(line_item, invoice):
   created = datetime.fromtimestamp(invoice.created, timezone.utc)
@@ -72,7 +83,8 @@ def getLineItemRecognitionRange(line_item, invoice):
 
   if start is None and end is None:
     try:
-      date_range = dateparser.find_date_range(line_item.get("description"), created, tz=config.accounting_tz)
+      date_range = dateparser.find_date_range(line_item.get(
+        "description"), created, tz=config.accounting_tz)
       if date_range is not None:
         start, end = date_range
 
@@ -81,7 +93,8 @@ def getLineItemRecognitionRange(line_item, invoice):
       pass
 
   if start is None and end is None:
-    print("Warning: unknown period for line item --", invoice.id, line_item.get("description"))
+    print("Warning: unknown period for line item --",
+          invoice.id, line_item.get("description"))
     start = created
     end = created
 
@@ -89,6 +102,7 @@ def getLineItemRecognitionRange(line_item, invoice):
   #   print("Period", start, end, "--", line_item.get("description"))
 
   return start.astimezone(config.accounting_tz), end.astimezone(config.accounting_tz)
+
 
 def createRevenueItems(invs):
   revenue_items = []
@@ -100,17 +114,21 @@ def createRevenueItems(invs):
     voided_at = None
     marked_uncollectible_at = None
     if invoice.status == "void":
-      voided_at = datetime.fromtimestamp(invoice.status_transitions.voided_at, timezone.utc).astimezone(config.accounting_tz)
+      voided_at = datetime.fromtimestamp(
+        invoice.status_transitions.voided_at, timezone.utc).astimezone(config.accounting_tz)
     elif invoice.status == "uncollectible":
-      marked_uncollectible_at = datetime.fromtimestamp(invoice.status_transitions.marked_uncollectible_at, timezone.utc).astimezone(config.accounting_tz)
+      marked_uncollectible_at = datetime.fromtimestamp(
+        invoice.status_transitions.marked_uncollectible_at, timezone.utc).astimezone(config.accounting_tz)
 
     credited_at = None
     credited_amount = None
     if invoice.post_payment_credit_notes_amount > 0:
       cns = stripe.CreditNote.list(invoice=invoice.id).data
       assert len(cns) == 1
-      credited_at = datetime.fromtimestamp(cns[0].created, timezone.utc).astimezone(config.accounting_tz)
-      credited_amount = decimal.Decimal(invoice.post_payment_credit_notes_amount) / 100
+      credited_at = datetime.fromtimestamp(
+        cns[0].created, timezone.utc).astimezone(config.accounting_tz)
+      credited_amount = decimal.Decimal(
+        invoice.post_payment_credit_notes_amount) / 100
 
     line_items = []
 
@@ -126,7 +144,8 @@ def createRevenueItems(invs):
       rate = retrieveTaxRate(invoice.total_tax_amounts[0]["tax_rate"])
       tax_percentage = decimal.Decimal(rate["percentage"])
 
-    finalized_date = datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(config.accounting_tz)
+    finalized_date = datetime.fromtimestamp(
+      invoice.status_transitions.finalized_at, timezone.utc).astimezone(config.accounting_tz)
 
     invoice_discount = decimal.Decimal(0)
     coupon = (invoice.get("discount", None) or {}).get("coupon", None)
@@ -134,7 +153,8 @@ def createRevenueItems(invs):
       if coupon.get("percent_off", None):
         invoice_discount = decimal.Decimal(coupon["percent_off"])
       elif coupon.get("amount_off", None):
-        invoice_discount = decimal.Decimal(coupon["amount_off"]) / 100 / (decimal.Decimal(invoice.subtotal_excluding_tax) / 100) * 100
+        invoice_discount = decimal.Decimal(coupon["amount_off"]) / 100 / (
+          decimal.Decimal(invoice.subtotal_excluding_tax) / 100) * 100
 
     is_subscription = invoice.get("subscription", None) is not None
 
@@ -144,19 +164,23 @@ def createRevenueItems(invs):
       lines = invoice.lines
 
     for line_item_idx, line_item in enumerate(lines):
-      text = "Invoice {} / {}".format(invoice.number, line_item.get("description", ""))
+      text = "Invoice {} / {}".format(invoice.number,
+                                      line_item.get("description", ""))
       start, end = getLineItemRecognitionRange(line_item, invoice)
 
       li_amount = decimal.Decimal(line_item["amount"]) / 100
       line_item_discount = decimal.Decimal(0)
-      coupon = line_item["discounts"][0].get("coupon", None) if len(line_item["discounts"]) > 0 else None
+      coupon = line_item["discounts"][0].get(
+        "coupon", None) if len(line_item["discounts"]) > 0 else None
       if coupon is not None:
         if coupon.get("percent_off", None):
           line_item_discount = decimal.Decimal(coupon["percent_off"])
         elif coupon.get("amount_off", None):
-          line_item_discount = decimal.Decimal(coupon["amount_off"]) / 100 / li_amount * 100
+          line_item_discount = decimal.Decimal(
+            coupon["amount_off"]) / 100 / li_amount * 100
       # TODO: combine line item and invoice discounts?
-      line_item_discount_factor = (1 - invoice_discount / 100) * (1 - line_item_discount / 100)
+      line_item_discount_factor = (
+        1 - invoice_discount / 100) * (1 - line_item_discount / 100)
 
       discounted_li_net = li_amount * line_item_discount_factor
       discounted_li_total = discounted_li_net
@@ -196,6 +220,7 @@ def createRevenueItems(invs):
     })
 
   return revenue_items
+
 
 def createAccountingRecords(revenue_item):
   created = revenue_item["created"]
@@ -242,7 +267,8 @@ def createAccountingRecords(revenue_item):
       })
 
     elif marked_uncollectible_at is not None:
-      print("Uncollectible", text, "Created", created, 'Marked uncollectible', marked_uncollectible_at)
+      print("Uncollectible", text, "Created", created,
+            'Marked uncollectible', marked_uncollectible_at)
       records.append({
         "date": marked_uncollectible_at,
         "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(amount_with_tax),
@@ -274,8 +300,8 @@ def createAccountingRecords(revenue_item):
   # If invoice was voided, marked uncollectible or credited fully in same month,
   # don't bother with pRAP
   if voided_at is not None and voided_at.strftime("%Y-%m") == created.strftime("%Y-%m") or \
-    marked_uncollectible_at is not None and marked_uncollectible_at.strftime("%Y-%m") == created.strftime("%Y-%m") or \
-    credited_at is not None and credited_at.strftime("%Y-%m") == created.strftime("%Y-%m") and credited_amount == amount_with_tax:
+          marked_uncollectible_at is not None and marked_uncollectible_at.strftime("%Y-%m") == created.strftime("%Y-%m") or \
+          credited_at is not None and credited_at.strftime("%Y-%m") == created.strftime("%Y-%m") and credited_amount == amount_with_tax:
     return records
 
   for line_item in line_items:
@@ -284,14 +310,16 @@ def createAccountingRecords(revenue_item):
     recognition_end = line_item["recognition_end"]
     text = line_item["text"]
 
-    months = recognition.split_months(recognition_start, recognition_end, [amount_with_tax])
+    months = recognition.split_months(
+      recognition_start, recognition_end, [amount_with_tax])
 
     base_months = list(filter(lambda month: month["start"] <= created, months))
     base_amount = sum(map(lambda month: month["amounts"][0], base_months))
 
     forward_amount = amount_with_tax - base_amount
 
-    forward_months = list(filter(lambda month: month["start"] > created, months))
+    forward_months = list(
+      filter(lambda month: month["start"] > created, months))
 
     if len(forward_months) > 0 and forward_amount > 0:
       records.append({
@@ -321,6 +349,7 @@ def createAccountingRecords(revenue_item):
         })
 
   return records
+
 
 def to_csv(inv):
   lines = [[
@@ -359,11 +388,13 @@ def to_csv(inv):
     lines.append([
       invoice.id,
       invoice.number,
-      datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(config.accounting_tz).strftime("%Y-%m-%d"),
+      datetime.fromtimestamp(invoice.status_transitions.finalized_at, timezone.utc).astimezone(
+        config.accounting_tz).strftime("%Y-%m-%d"),
 
       format(total_before_tax, ".2f"),
       format(tax, ".2f") if tax else None,
-      format(decimal.Decimal(invoice.tax_percent), ".0f") if "tax_percent" in invoice and invoice.tax_percent else None,
+      format(decimal.Decimal(invoice.tax_percent),
+             ".0f") if "tax_percent" in invoice and invoice.tax_percent else None,
       format(total, ".2f"),
 
       cus.id,
@@ -379,6 +410,7 @@ def to_csv(inv):
     ])
 
   return csv.lines_to_csv(lines)
+
 
 def to_recognized_month_csv2(revenue_items):
   lines = [[
@@ -409,7 +441,8 @@ def to_recognized_month_csv2(revenue_items):
     credited_amount = revenue_item.get("credited_amount", None)
     marked_uncollectible_at = revenue_item.get("marked_uncollectible_at", None)
 
-    last_line_item_recognition_end = max((line_item["recognition_end"] for line_item in revenue_item["line_items"]), default=None)
+    last_line_item_recognition_end = max(
+      (line_item["recognition_end"] for line_item in revenue_item["line_items"]), default=None)
     if last_line_item_recognition_end is not None and revenue_item["created"] + timedelta(days=1) < last_line_item_recognition_end:
       revenue_type = "Prepaid"
     else:
@@ -419,7 +452,8 @@ def to_recognized_month_csv2(revenue_items):
     for line_item in revenue_item["line_items"]:
       end = voided_at or marked_uncollectible_at or credited_at or line_item["recognition_end"]
       for month in recognition.split_months(line_item["recognition_start"], line_item["recognition_end"], [line_item["amount_net"]]):
-        accounting_date = max(revenue_item["created"], end if end < month["start"] else month["start"])
+        accounting_date = max(
+          revenue_item["created"], end if end < month["start"] else month["start"])
 
         lines.append([
           revenue_item["id"],
@@ -445,26 +479,31 @@ def to_recognized_month_csv2(revenue_items):
         if voided_at is not None:
           reverse = lines[-1].copy()
           reverse[8] = format(month["amounts"][0] * -1, ".2f")
-          reverse[12] = max(revenue_item["created"], end if end < month["end"] else month["start"]).strftime("%Y-%m-%d")
+          reverse[12] = max(revenue_item["created"], end if end <
+                            month["end"] else month["start"]).strftime("%Y-%m-%d")
           lines.append(reverse)
 
         elif marked_uncollectible_at is not None:
           reverse = lines[-1].copy()
           reverse[8] = format(month["amounts"][0] * -1, ".2f")
-          reverse[12] = max(revenue_item["created"], end if end < month["end"] else month["start"]).strftime("%Y-%m-%d")
+          reverse[12] = max(revenue_item["created"], end if end <
+                            month["end"] else month["start"]).strftime("%Y-%m-%d")
           lines.append(reverse)
 
         elif credited_at is not None:
           reverse = lines[-1].copy()
-          reverse[8] = format(month["amounts"][0] * -1 * (credited_amount / amount_with_tax), ".2f")
-          reverse[12] = max(revenue_item["created"], end if end < month["end"] else month["start"]).strftime("%Y-%m-%d")
+          reverse[8] = format(month["amounts"][0] * -1 *
+                              (credited_amount / amount_with_tax), ".2f")
+          reverse[12] = max(revenue_item["created"], end if end <
+                            month["end"] else month["start"]).strftime("%Y-%m-%d")
           lines.append(reverse)
-
 
   return csv.lines_to_csv(lines)
 
+
 def roundCentsDown(dec):
   return math.floor(dec * 100) / 100
+
 
 def accrualRecords(invoiceDate, invoiceAmount, customerAccount, revenueAccount, text, firstRevenueDate, revenueSpreadMonths, includeOriginalInvoice=True):
   records = []
@@ -483,12 +522,14 @@ def accrualRecords(invoiceDate, invoiceAmount, customerAccount, revenueAccount, 
   revenuePerPeriod = roundCentsDown(invoiceAmount / revenueSpreadMonths)
   if invoiceDate < firstRevenueDate:
     accrueAmount = invoiceAmount
-    accrueText = "{} / Rueckstellung ({} Monate)".format(text, revenueSpreadMonths)
+    accrueText = "{} / Rueckstellung ({} Monate)".format(text,
+                                                         revenueSpreadMonths)
     periodsBooked = 0
     periodDate = firstRevenueDate
   else:
     accrueAmount = invoiceAmount - revenuePerPeriod
-    accrueText = "{} / Rueckstellung Anteilig ({}/{} Monate)".format(text, revenueSpreadMonths-1, revenueSpreadMonths)
+    accrueText = "{} / Rueckstellung Anteilig ({}/{} Monate)".format(
+      text, revenueSpreadMonths - 1, revenueSpreadMonths)
     periodsBooked = 1
     periodDate = firstRevenueDate + datedelta.MONTH
 
@@ -517,7 +558,7 @@ def accrualRecords(invoiceDate, invoiceAmount, customerAccount, revenueAccount, 
       "WKZ Umsatz": "EUR",
       "Konto": "990",
       "Gegenkonto (ohne BU-Schlüssel)": str(revenueAccount),
-      "Buchungstext": "{} / Aufloesung Rueckstellung Monat {}/{}".format(text, periodsBooked+1, revenueSpreadMonths),
+      "Buchungstext": "{} / Aufloesung Rueckstellung Monat {}/{}".format(text, periodsBooked + 1, revenueSpreadMonths),
     })
 
     periodDate = periodDate + datedelta.MONTH

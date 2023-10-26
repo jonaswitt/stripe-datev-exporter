@@ -1,10 +1,12 @@
-from datetime import datetime, timezone
 import sys
+from datetime import datetime, timezone
+
 import stripe
 
 from stripe_datev import config, output
 
 customers_cached = {}
+
 
 def retrieveCustomer(id):
   if isinstance(id, str):
@@ -19,6 +21,7 @@ def retrieveCustomer(id):
   else:
     raise Exception("Unexpected retrieveCustomer() argument: {}".format(id))
 
+
 def getCustomerName(customer):
   if customer.get("deleted", False):
     return customer.id
@@ -27,11 +30,14 @@ def getCustomerName(customer):
   else:
     return customer.name
 
+
 tax_ids_cached = {}
+
 
 def getCustomerTaxId(customer):
   if "tax_ids" in customer:
-    tax_id = next((tax_id for tax_id in customer.tax_ids.data if tax_id.type == "eu_vat" and tax_id.verification.status == "verified"), None)
+    tax_id = next((tax_id for tax_id in customer.tax_ids.data if tax_id.type ==
+                  "eu_vat" and tax_id.verification.status == "verified"), None)
     tax_id = tax_id.value if tax_id is not None else None
   else:
     if customer.id in tax_ids_cached:
@@ -40,6 +46,7 @@ def getCustomerTaxId(customer):
     tax_id = ids[0].value if len(ids) > 0 else None
     tax_ids_cached[customer.id] = tax_id
   return tax_id
+
 
 country_codes_eu = [
   "AT",
@@ -70,6 +77,7 @@ country_codes_eu = [
   "SE",
 ]
 
+
 def getAccountingProps(customer, invoice=None, checkout_session=None):
   props = {
     "vat_region": "World",
@@ -89,7 +97,8 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
   if invoice is not None:
     invoice_tax = invoice.get("tax", None)
   elif checkout_session is not None:
-    invoice_tax = checkout_session.get("total_details", {}).get("amount_tax", None)
+    invoice_tax = checkout_session.get(
+      "total_details", {}).get("amount_tax", None)
 
   # use tax status at time of invoice creation
   if invoice is not None and "customer_tax_exempt" in invoice:
@@ -126,10 +135,12 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
         print("Warning: tax exempt customer, treating like 'reverse'", customer.id)
         props["tax_exempt"] = "reverse"
       if tax_exempt == "none":
-        print("Warning: taxable customer without tax on invoice, treating like 'reverse'", customer.id, invoice.get("id", "n/a") if invoice is not None else "n/a")
+        print("Warning: taxable customer without tax on invoice, treating like 'reverse'",
+              customer.id, invoice.get("id", "n/a") if invoice is not None else "n/a")
         props["tax_exempt"] = "reverse"
       if not (invoice_tax is None or invoice_tax == 0):
-        print("Warning: tax on invoice of reverse charge customer", invoice.get("id", "n/a") if invoice is not None else "n/a")
+        print("Warning: tax on invoice of reverse charge customer",
+              invoice.get("id", "n/a") if invoice is not None else "n/a")
       if country in country_codes_eu and vat_id is None:
         print("Warning: EU reverse charge customer without VAT ID", customer.id)
 
@@ -152,14 +163,18 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
   props["revenue_account"] = "8400"
   return props
 
+
 def getRevenueAccount(customer, invoice=None, checkout_session=None):
   return getAccountingProps(customer, invoice=invoice, checkout_session=checkout_session)["revenue_account"]
+
 
 def getCustomerAccount(customer, invoice=None, checkout_session=None):
   return getAccountingProps(customer, invoice=invoice, checkout_session=checkout_session)["customer_account"]
 
+
 def getDatevTaxKey(customer, invoice=None, checkout_session=None):
   return getAccountingProps(customer, invoice=invoice, checkout_session=checkout_session)["datev_tax_key"]
+
 
 def validate_customers():
   customer_count = 0
@@ -176,6 +191,7 @@ def validate_customers():
 
   print("Validated {} customers".format(customer_count))
 
+
 def fill_account_numbers():
   highest_account_number = None
   fill_customers = []
@@ -188,7 +204,8 @@ def fill_account_numbers():
   if highest_account_number is None:
     highest_account_number = 10100 - 1
 
-  print("{} customers without account number, highest number is {}".format(len(fill_customers), highest_account_number))
+  print("{} customers without account number, highest number is {}".format(
+    len(fill_customers), highest_account_number))
 
   for customer in reversed(fill_customers):
     # print(customer.id, customer.metadata)
@@ -207,8 +224,10 @@ def fill_account_numbers():
 
     print(customer.id, highest_account_number)
 
+
 def list_account_numbers(file_path):
-  customer_it = stripe.Customer.list(expand=["data.tax_ids"]).auto_paging_iter()
+  customer_it = stripe.Customer.list(
+    expand=["data.tax_ids"]).auto_paging_iter()
   if file_path is None:
     output.printAccounts(sys.stdout, customer_it)
   else:
