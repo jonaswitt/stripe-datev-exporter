@@ -1,3 +1,5 @@
+import unittest
+import pytz
 import calendar
 import datetime
 import re
@@ -17,12 +19,17 @@ MONTHS = [
   ["Dec", "December"],
 ]
 
-def flatten(t):
-    return [item for sublist in t for item in sublist]
 
-YEAR_REGEX = re.compile("(?<=[\D^])(2019|2020|2021|2022|2023|2024|2025|2026)(?=\D|$)", re.M)
-MONTH_REGEX = re.compile("(?<=[\W^])({})(?=\W|$)".format("|".join(flatten(MONTHS))), re.M)
+def flatten(t):
+  return [item for sublist in t for item in sublist]
+
+
+YEAR_REGEX = re.compile(
+  "(?<=[\D^])(2019|2020|2021|2022|2023|2024|2025|2026)(?=\D|$)", re.M)
+MONTH_REGEX = re.compile(
+  "(?<=[\W^])({})(?=\W|$)".format("|".join(flatten(MONTHS))), re.M)
 DAY_REGEX = re.compile("(?<=[\D^])([0-9]{1,2})(?:st|nd|rd|th)(?=\W|$)", re.M)
+
 
 def find_date_range(text, ref_date=None, tz=None):
   years = [int(y) for y in YEAR_REGEX.findall(text)]
@@ -80,8 +87,7 @@ def find_date_range(text, ref_date=None, tz=None):
 
   return (start, end)
 
-import unittest
-import pytz
+
 class DateParserTestSuite(unittest.TestCase):
 
   ref_date = datetime.datetime(2021, 5, 10)
@@ -95,8 +101,10 @@ class DateParserTestSuite(unittest.TestCase):
     else:
       self.assertIsNotNone(start, "Did not expect start of range")
       self.assertIsNotNone(end, "Did not expect end of range")
-      self.assertEqual(r[0], self.tz.localize(start), "Start of range does not match: '{}'".format(strRange))
-      self.assertEqual(r[1], self.tz.localize(end), "End of range does not match: '{}'".format(strRange))
+      self.assertEqual(r[0], self.tz.localize(
+        start), "Start of range does not match: '{}'".format(strRange))
+      self.assertEqual(r[1], self.tz.localize(
+        end), "End of range does not match: '{}'".format(strRange))
 
   def test_parsing(self):
     self.assertStringRange(
@@ -106,12 +114,14 @@ class DateParserTestSuite(unittest.TestCase):
 
     self.assertStringRange(
       "Njord Analytics & Njord Player, RC44, valid Jan-Nov 2021",
-      datetime.datetime(2021, 1, 1), datetime.datetime(2021, 11, 30, 23, 59, 59)
+      datetime.datetime(2021, 1, 1), datetime.datetime(
+        2021, 11, 30, 23, 59, 59)
     )
 
     self.assertStringRange(
       "Njord Player & Fleet Race reports, per day, May 20th-23rd",
-      datetime.datetime(2021, 5, 20), datetime.datetime(2021, 5, 23, 23, 59, 59)
+      datetime.datetime(2021, 5, 20), datetime.datetime(
+        2021, 5, 23, 23, 59, 59)
     )
 
     self.assertStringRange(
@@ -121,12 +131,14 @@ class DateParserTestSuite(unittest.TestCase):
 
     self.assertStringRange(
       "Njord Analytics and Player; (ClubSwan 36); Tue Jun 22nd 2021",
-      datetime.datetime(2021, 6, 22), datetime.datetime(2021, 6, 22, 23, 59, 59)
+      datetime.datetime(2021, 6, 22), datetime.datetime(
+        2021, 6, 22, 23, 59, 59)
     )
 
     self.assertStringRange(
       "Njord Analytics & Njord Player; 2x Laser Radial; valid November 1st 2021 to December 31st 2024 (price per year)",
-      datetime.datetime(2021, 11, 1), datetime.datetime(2024, 12, 31, 23, 59, 59)
+      datetime.datetime(2021, 11, 1), datetime.datetime(
+        2024, 12, 31, 23, 59, 59)
     )
 
     self.assertStringRange(
@@ -143,6 +155,7 @@ class DateParserTestSuite(unittest.TestCase):
       "Njord Analytics & Njord Player, SailGP (8 boats), valid Jan 1st 2022 - Mar 31st 2022 (incl. loading all data from 2021/22 SailGP season)",
       datetime.datetime(2022, 1, 1), datetime.datetime(2022, 3, 31, 23, 59, 59)
     )
+
 
 if __name__ == '__main__':
   unittest.main()

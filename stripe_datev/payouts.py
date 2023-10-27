@@ -3,6 +3,7 @@ import decimal
 from datetime import datetime, timezone
 from . import output
 
+
 def listPayouts(fromTime, toTime):
   payouts = stripe.Payout.list(
     created={
@@ -27,10 +28,12 @@ def listPayouts(fromTime, toTime):
     }
     yield record
 
+
 def createAccountingRecords(payouts):
   records = []
   for payout in payouts:
-    text = "Stripe Payout {} / {}".format(payout["id"], payout["description"] or "")
+    text = "Stripe Payout {} / {}".format(
+      payout["id"], payout["description"] or "")
     record = {
       "date": payout["arrival_date"],
       "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(payout["amount"]),
@@ -71,6 +74,7 @@ def createAccountingRecords(payouts):
     records.append(record)
   return records
 
+
 def createAccountingRecordsContributions(balance_transactions):
   records = []
   for balance_transaction in balance_transactions:
@@ -88,4 +92,3 @@ def createAccountingRecordsContributions(balance_transactions):
     }
     records.append(record)
   return records
-

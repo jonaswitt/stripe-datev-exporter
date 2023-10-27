@@ -126,15 +126,20 @@ fields = [
   "",
 ]
 
+
 def filterRecords(records, fromTime=None, toTime=None):
   return list(filter(lambda r: (fromTime is None or r["date"] >= fromTime) and (toTime is None or r["date"] <= toTime), records))
+
 
 def writeRecords(fileName, records, fromTime=None, toTime=None, bezeichung=None):
   if len(records) == 0:
     return
   with open(fileName, 'w', encoding="latin1", errors="replace", newline="\r\n") as fp:
-    printRecords(fp, records, fromTime=fromTime, toTime=toTime, bezeichung=bezeichung)
-    print("Wrote {} acc. records  to {}".format(str(len(records)).rjust(4, " "), os.path.relpath(fp.name, os.getcwd())))
+    printRecords(fp, records, fromTime=fromTime,
+                 toTime=toTime, bezeichung=bezeichung)
+    print("Wrote {} acc. records  to {}".format(
+      str(len(records)).rjust(4, " "), os.path.relpath(fp.name, os.getcwd())))
+
 
 def printRecords(textFileHandle, records, fromTime=None, toTime=None, bezeichung=None):
   if fromTime is not None or toTime is not None:
@@ -142,32 +147,41 @@ def printRecords(textFileHandle, records, fromTime=None, toTime=None, bezeichung
 
   minTime = fromTime or min([r["date"] for r in records])
   maxTime = toTime or max([r["date"] for r in records])
-  years = set(r["date"].astimezone(config.accounting_tz).strftime("%Y") for r in records)
+  years = set(r["date"].astimezone(config.accounting_tz).strftime("%Y")
+              for r in records)
   if len(years) > 1:
-    raise Exception("May not print records from multiple years: {}".format(years))
+    raise Exception(
+      "May not print records from multiple years: {}".format(years))
 
   header = [
-    '"EXTF"', # DATEV-Format (DTVF - von DATEV erzeugt, EXTF Fremdprogramm)
-    '700', # Version des DATEV-Formats (141 bedeutet 1.41)
-    '21', # Datenkategorie (21 = Buchungsstapel, 67 = Buchungstextkonstanten, 16 = Debitoren/Kreditoren, 20 = Kontenbeschriftungen usw.)
-    'Buchungsstapel', # Formatname (Buchungsstapel, Buchungstextkonstanten, Debitoren/Kreditoren, Kontenbeschriftungen usw.)
-    '5', # Formatversion (bezogen auf Formatname)
-    datetime.today().astimezone(config.accounting_tz).strftime("%Y%m%d%H%M%S"), # '20190211202957107', # erzeugt am
-    '', # importiert am
-    'BH', # Herkunft
-    '', # exportiert von
-    '', # importiert von
-    str(config.berater_nr), # Beraternummer
-    str(config.mandenten_nr), # Mandantennummer
-    minTime.astimezone(config.accounting_tz).strftime('%Y') + '0101', # Wirtschaftsjahresbeginn
-    '4', # Sachkontenlänge
-    minTime.astimezone(config.accounting_tz).strftime('%Y%m%d'), # Datum Beginn Buchungsstapel
-    maxTime.astimezone(config.accounting_tz).strftime('%Y%m%d'), # Datum Ende Buchungsstapel
-    '"{}"'.format(bezeichung) if bezeichung else "", # Bezeichnung (Vorlaufname, z. B. Buchungsstapel)
-    '', # Diktatkürzel
-    '1', # Buchungstyp (bei Buchungsstapel = 1)
-    '0', # Rechnungslegungszweck
-    '0', # Festschreibung
+    '"EXTF"',  # DATEV-Format (DTVF - von DATEV erzeugt, EXTF Fremdprogramm)
+    '700',  # Version des DATEV-Formats (141 bedeutet 1.41)
+    # Datenkategorie (21 = Buchungsstapel, 67 = Buchungstextkonstanten, 16 = Debitoren/Kreditoren, 20 = Kontenbeschriftungen usw.)
+    '21',
+    # Formatname (Buchungsstapel, Buchungstextkonstanten, Debitoren/Kreditoren, Kontenbeschriftungen usw.)
+    'Buchungsstapel',
+    '5',  # Formatversion (bezogen auf Formatname)
+    datetime.today().astimezone(config.accounting_tz).strftime(
+      "%Y%m%d%H%M%S"),  # '20190211202957107', # erzeugt am
+    '',  # importiert am
+    'BH',  # Herkunft
+    '',  # exportiert von
+    '',  # importiert von
+    str(config.berater_nr),  # Beraternummer
+    str(config.mandenten_nr),  # Mandantennummer
+    minTime.astimezone(config.accounting_tz).strftime(
+      '%Y') + '0101',  # Wirtschaftsjahresbeginn
+    '4',  # Sachkontenlänge
+    minTime.astimezone(config.accounting_tz).strftime(
+      '%Y%m%d'),  # Datum Beginn Buchungsstapel
+    maxTime.astimezone(config.accounting_tz).strftime(
+      '%Y%m%d'),  # Datum Ende Buchungsstapel
+    # Bezeichnung (Vorlaufname, z. B. Buchungsstapel)
+    '"{}"'.format(bezeichung) if bezeichung else "",
+    '',  # Diktatkürzel
+    '1',  # Buchungstyp (bei Buchungsstapel = 1)
+    '0',  # Rechnungslegungszweck
+    '0',  # Festschreibung
     # 'EUR', # WKZ
   ]
   textFileHandle.write(";".join(header))
@@ -185,14 +199,18 @@ def printRecords(textFileHandle, records, fromTime=None, toTime=None, bezeichung
     textFileHandle.write(";".join(recordValues))
     textFileHandle.write("\n")
 
+
 def formatDateDatev(date):
   return date.astimezone(config.accounting_tz).strftime("%d%m")
+
 
 def formatDateHuman(date):
   return date.astimezone(config.accounting_tz).strftime("%d.%m.%Y")
 
+
 def formatDecimal(d):
   return "{0:.2f}".format(d).replace(",", "").replace(".", ",")
+
 
 fields_accounts = [
   "Konto",
@@ -201,7 +219,7 @@ fields_accounts = [
   "Name (Adressattyp natürl. Person)",
   "Vorname (Adressattyp natürl. Person)",
   "Name (Adressattyp keine Angabe)",
-  "Adressattyp", # 1 = natürl. Person 2 = Unternehmen
+  "Adressattyp",  # 1 = natürl. Person 2 = Unternehmen
   "Kurzbezeichnung",
   "EU-Land",
   "EU-UStID",
@@ -215,29 +233,34 @@ fields_accounts = [
   "E-Mail",
 ]
 
+
 def printAccounts(textFileHandle, customers):
   header = [
-    '"EXTF"', # DATEV-Format (DTVF - von DATEV erzeugt, EXTF Fremdprogramm)
-    '700', # Version des DATEV-Formats (141 bedeutet 1.41)
-    '16', # Datenkategorie (21 = Buchungsstapel, 67 = Buchungstextkonstanten, 16 = Debitoren/Kreditoren, 20 = Kontenbeschriftungen usw.)
-    'Debitoren/Kreditoren', # Formatname (Buchungsstapel, Buchungstextkonstanten, Debitoren/Kreditoren, Kontenbeschriftungen usw.)
-    '5', # Formatversion (bezogen auf Formatname)
-    datetime.today().astimezone(config.accounting_tz).strftime("%Y%m%d%H%M%S"), # '20190211202957107', # erzeugt am
-    '', # importiert am
-    'BH', # Herkunft
-    '', # exportiert von
-    '', # importiert von
-    str(config.berater_nr), # Beraternummer
-    str(config.mandenten_nr), # Mandantennummer
-    datetime.today().astimezone(config.accounting_tz).strftime('%Y') + '0101', # Wirtschaftsjahresbeginn
-    '4', # Sachkontenlänge
-    '', # Datum Beginn Buchungsstapel
-    '', # Datum Ende Buchungsstapel
-    '', # Bezeichnung (Vorlaufname, z. B. Buchungsstapel)
-    '', # Diktatkürzel
-    '0', # Buchungstyp (bei Buchungsstapel = 1)
-    '0', # Rechnungslegungszweck
-    '0', # Festschreibung
+    '"EXTF"',  # DATEV-Format (DTVF - von DATEV erzeugt, EXTF Fremdprogramm)
+    '700',  # Version des DATEV-Formats (141 bedeutet 1.41)
+    # Datenkategorie (21 = Buchungsstapel, 67 = Buchungstextkonstanten, 16 = Debitoren/Kreditoren, 20 = Kontenbeschriftungen usw.)
+    '16',
+    # Formatname (Buchungsstapel, Buchungstextkonstanten, Debitoren/Kreditoren, Kontenbeschriftungen usw.)
+    'Debitoren/Kreditoren',
+    '5',  # Formatversion (bezogen auf Formatname)
+    datetime.today().astimezone(config.accounting_tz).strftime(
+      "%Y%m%d%H%M%S"),  # '20190211202957107', # erzeugt am
+    '',  # importiert am
+    'BH',  # Herkunft
+    '',  # exportiert von
+    '',  # importiert von
+    str(config.berater_nr),  # Beraternummer
+    str(config.mandenten_nr),  # Mandantennummer
+    datetime.today().astimezone(config.accounting_tz).strftime(
+      '%Y') + '0101',  # Wirtschaftsjahresbeginn
+    '4',  # Sachkontenlänge
+    '',  # Datum Beginn Buchungsstapel
+    '',  # Datum Ende Buchungsstapel
+    '',  # Bezeichnung (Vorlaufname, z. B. Buchungsstapel)
+    '',  # Diktatkürzel
+    '0',  # Buchungstyp (bei Buchungsstapel = 1)
+    '0',  # Rechnungslegungszweck
+    '0',  # Festschreibung
     # 'EUR', # WKZ
   ]
   textFileHandle.write(";".join(header))
