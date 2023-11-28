@@ -150,7 +150,7 @@ def createAccountingRecords(charges):
       "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(decimal.Decimal(charge.amount) / 100),
       "Soll/Haben-Kennzeichen": "S",
       "WKZ Umsatz": "EUR",
-      "Konto": "1201",
+      "Konto": str(config.accounts["bank"]),
       "Gegenkonto (ohne BU-Schlüssel)": acc_props["customer_account"],
       "Buchungstext": "Stripe Payment ({})".format(charge.id),
       "Belegfeld 1": number,
@@ -161,8 +161,8 @@ def createAccountingRecords(charges):
       "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(fee_amount),
       "Soll/Haben-Kennzeichen": "S",
       "WKZ Umsatz": "EUR",
-      "Konto": "70025",
-      "Gegenkonto (ohne BU-Schlüssel)": "1201",
+      "Konto": str(config.accounts["stripe_fees"]),
+      "Gegenkonto (ohne BU-Schlüssel)": str(config.accounts["bank"]),
       "Buchungstext": "{} ({})".format(fee_desc or "Stripe Fee", charge.id),
     })
 
@@ -176,7 +176,7 @@ def createAccountingRecords(charges):
         "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(decimal.Decimal(refund.amount) / 100),
         "Soll/Haben-Kennzeichen": "H",
         "WKZ Umsatz": "EUR",
-        "Konto": "1201",
+        "Konto": str(config.accounts["bank"]),
         "Gegenkonto (ohne BU-Schlüssel)": acc_props["customer_account"],
         "Buchungstext": "Stripe Payment Refund ({})".format(charge.id),
         "Belegfeld 1": number,

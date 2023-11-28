@@ -1,7 +1,7 @@
 import stripe
 import decimal
 from datetime import datetime, timezone
-from . import output
+from . import output, config
 
 
 def listPayouts(fromTime, toTime):
@@ -39,8 +39,8 @@ def createAccountingRecords(payouts):
       "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(payout["amount"]),
       "Soll/Haben-Kennzeichen": "S",
       "WKZ Umsatz": "EUR",
-      "Konto": "1360",
-      "Gegenkonto (ohne BU-Schlüssel)": "1201",
+      "Konto": str(config.accounts["transit"]),
+      "Gegenkonto (ohne BU-Schlüssel)": str(config.accounts["bank"]),
       # "BU-Schlüssel": "0",
       # "Belegdatum": output.formatDateDatev(payout["arrival_date"]),
       # "Belegfeld 1": payout["id"],
@@ -83,8 +83,8 @@ def createAccountingRecordsContributions(balance_transactions):
       "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(-decimal.Decimal(balance_transaction["amount"]) / 100),
       "Soll/Haben-Kennzeichen": "S",
       "WKZ Umsatz": "EUR",
-      "Konto": "4600",
-      "Gegenkonto (ohne BU-Schlüssel)": "1201",
+      "Konto": str(config.accounts["contributions"]),
+      "Gegenkonto (ohne BU-Schlüssel)": str(config.accounts["bank"]),
       # "BU-Schlüssel": "0",
       # "Belegdatum": output.formatDateDatev(payout["arrival_date"]),
       # "Belegfeld 1": payout["id"],

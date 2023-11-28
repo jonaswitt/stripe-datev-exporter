@@ -37,7 +37,7 @@ def createAccountingRecords(transfers):
       "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(decimal.Decimal(net_amount) / 100),
       "Soll/Haben-Kennzeichen": "S",
       "WKZ Umsatz": "EUR",
-      "Konto": "4909",
+      "Konto": str(config.accounts["external_services"]),
       "Gegenkonto (ohne BU-Schlüssel)": transfer["destination"]["metadata"]["accountNumber"],
       "Buchungstext": "Fremdleistung {} anteilig".format(invoiceNumber or transfer.id),
       "Belegfeld 1": transfer.id,
@@ -49,7 +49,7 @@ def createAccountingRecords(transfers):
       "Soll/Haben-Kennzeichen": "S",
       "WKZ Umsatz": "EUR",
       "Konto": transfer["destination"]["metadata"]["accountNumber"],
-      "Gegenkonto (ohne BU-Schlüssel)": "1201",
+      "Gegenkonto (ohne BU-Schlüssel)": str(config.accounts["bank"]),
       "Buchungstext": "Fremdleistung {} anteilig".format(invoiceNumber or transfer.id),
       "Belegfeld 1": transfer.id,
     })

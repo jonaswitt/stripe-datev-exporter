@@ -8,3 +8,4 @@ company = config["company"]
 accounting_tz = pytz.timezone(company["timezone"])
 
 datev = config["datev"]
+accounts = config["accounts"]
