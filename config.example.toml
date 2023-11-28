@@ -1,0 +1,6 @@
+[company]
+timezone = "Europe/Berlin"
+
+[datev]
+berater_nr = 1
+mandenten_nr = 1

@@ -38,6 +38,7 @@ pids
 
 # dotenv environment variables file
 .env
+config.toml
 
 .DS_Store
 out/*
