@@ -1,0 +1,23 @@
+[company]
+timezone = "Europe/Berlin"
+
+[datev]
+berater_nr = 1
+mandenten_nr = 1
+
+[accounts]
+bank = "1201"
+transit = "1360"
+contributions = "4600"
+external_services = "4909"
+stripe_fees = "70025"
+
+sammel_debitor = "10001"
+prap = "990"
+
+revenue_german_vat = "8400"
+revenue_reverse_charge_eu = "8336"
+account_reverse_charge_world = "8338"
+
+datev_tax_key_germany = ""
+datev_tax_key_reverse = "40"

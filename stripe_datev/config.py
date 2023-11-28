@@ -1,6 +1,11 @@
 import pytz
+import tomli
 
-accounting_tz = pytz.timezone('Europe/Berlin')
+with open('config.toml', 'rb') as f:
+  config = tomli.load(f)
 
-berater_nr = 1
-mandenten_nr = 1
+company = config["company"]
+accounting_tz = pytz.timezone(company["timezone"])
+
+datev = config["datev"]
+accounts = config["accounts"]

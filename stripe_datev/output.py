@@ -167,8 +167,8 @@ def printRecords(textFileHandle, records, fromTime=None, toTime=None, bezeichung
     'BH',  # Herkunft
     '',  # exportiert von
     '',  # importiert von
-    str(config.berater_nr),  # Beraternummer
-    str(config.mandenten_nr),  # Mandantennummer
+    str(config.datev["berater_nr"]),  # Beraternummer
+    str(config.datev["mandenten_nr"]),  # Mandantennummer
     minTime.astimezone(config.accounting_tz).strftime(
       '%Y') + '0101',  # Wirtschaftsjahresbeginn
     '4',  # Sachkontenlänge
