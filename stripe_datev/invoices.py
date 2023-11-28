@@ -13,10 +13,10 @@ invoices_cached = {}
 def listFinalizedInvoices(fromTime, toTime):
   invoices = stripe.Invoice.list(
     created={
-      "lt": int(toTime.timestamp())
-    },
-    due_date={
-      "gte": int(fromTime.timestamp()),
+      "lt": int(toTime.timestamp()),
+      # Increase this padding if you have invoices where more than
+      # 1 month passed between creation and finalization
+      "gte": int((fromTime - datedelta.MONTH).timestamp()),
     },
     expand=["data.customer", "data.customer.tax_ids"]
   ).auto_paging_iter()
