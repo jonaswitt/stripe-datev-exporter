@@ -27,9 +27,10 @@ def createAccountingRecords(transfers):
       transfer.created, timezone.utc).astimezone(config.accounting_tz)
 
     net_amount = transfer.amount - \
-        (transfer.source_transaction.application_fee_amount or 0)
+        (transfer.source_transaction.application_fee_amount if transfer.source_transaction else None or 0)
 
-    invoice = transfer.source_transaction.get("invoice", None)
+    invoice = transfer.source_transaction.get(
+      "invoice", None) if transfer.source_transaction else None
     invoiceNumber = invoice.number if invoice else None
 
     records.append({
