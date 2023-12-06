@@ -318,7 +318,7 @@ def createAccountingRecords(revenue_item):
     forward_months = list(
       filter(lambda month: month["start"] > created, months))
 
-    if len(forward_months) > 0 and forward_amount > 0:
+    if len(forward_months) > 0 and forward_amount != 0:
       records.append({
         "date": created,
         "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(forward_amount),
