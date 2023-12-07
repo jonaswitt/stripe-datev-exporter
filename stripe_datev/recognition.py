@@ -19,11 +19,15 @@ def split_months(start, end, amounts):
   remaining_amounts = list(amounts)
   months = []
   while current_month <= end:
-    start_of_month = current_month.replace(day=1, hour=0, minute=0, second=0)
-    end_of_month = current_month.replace(day=calendar.monthrange(
-      current_month.year, current_month.month)[1], hour=23, minute=59, second=59, tzinfo=None)
-    if start_of_month.tzinfo:
-      end_of_month = start_of_month.tzinfo.localize(end_of_month)
+    start_of_month = datetime.datetime(
+      year=current_month.year, month=current_month.month, day=1)
+    if current_month.tzinfo:
+      start_of_month = current_month.tzinfo.localize(start_of_month)
+    end_of_month = datetime.datetime(
+      year=current_month.year, month=current_month.month, day=calendar.monthrange(
+          current_month.year, current_month.month)[1], hour=23, minute=59, second=59)
+    if current_month.tzinfo:
+      end_of_month = current_month.tzinfo.localize(end_of_month)
 
     month_duration = min(end, end_of_month) - max(start,
                                                   start_of_month) + datetime.timedelta(seconds=1)
