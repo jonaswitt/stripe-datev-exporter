@@ -100,7 +100,7 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
       "total_details", {}).get("amount_tax", None)
 
   # use tax status at time of invoice creation
-  if invoice is not None and "customer_tax_exempt" in invoice:
+  if invoice is not None and "customer_tax_exempt" in invoice and not invoice["automatic_tax"]["enabled"]:
     tax_exempt = invoice["customer_tax_exempt"]
   else:
     tax_exempt = customer.tax_exempt
