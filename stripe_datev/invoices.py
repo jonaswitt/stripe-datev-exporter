@@ -144,19 +144,10 @@ def createRevenueItems(invs):
     finalized_date = datetime.fromtimestamp(
       invoice.status_transitions.finalized_at, timezone.utc).astimezone(config.accounting_tz)
 
-    invoice_discount = decimal.Decimal(0)
-    coupon = (invoice.get("discount", None) or {}).get("coupon", None)
-    if coupon is not None:
-      if coupon.get("percent_off", None):
-        invoice_discount = decimal.Decimal(coupon["percent_off"])
-      elif coupon.get("amount_off", None):
-        invoice_discount = decimal.Decimal(coupon["amount_off"]) / 100 / (
-          decimal.Decimal(invoice.subtotal_excluding_tax) / 100) * 100
-
     is_subscription = invoice.get("subscription", None) is not None
 
-    if invoice.lines.has_more or any(len(li.get("discounts", [])) > 0 for li in invoice.lines):
-      lines = invoice.lines.list(expand=["data.discounts"]).auto_paging_iter()
+    if invoice.lines.has_more:
+      lines = invoice.lines.list().auto_paging_iter()
     else:
       lines = invoice.lines
 
@@ -165,37 +156,24 @@ def createRevenueItems(invs):
                                       line_item.get("description", ""))
       start, end = getLineItemRecognitionRange(line_item, invoice)
 
-      li_amount = decimal.Decimal(line_item["amount"]) / 100
-      line_item_discount = decimal.Decimal(0)
-      coupon = line_item["discounts"][0].get(
-        "coupon", None) if len(line_item["discounts"]) > 0 else None
-      if coupon is not None:
-        if coupon.get("percent_off", None):
-          line_item_discount = decimal.Decimal(coupon["percent_off"])
-        elif coupon.get("amount_off", None):
-          line_item_discount = decimal.Decimal(
-            coupon["amount_off"]) / 100 / li_amount * 100
-      # TODO: combine line item and invoice discounts?
-      line_item_discount_factor = (
-        1 - invoice_discount / 100) * (1 - line_item_discount / 100)
+      li_amount_net = decimal.Decimal(line_item["amount"]) / 100
+      for discount in line_item["discount_amounts"]:
+        li_amount_net -= decimal.Decimal(discount["amount"]) / 100
 
-      discounted_li_net = li_amount * line_item_discount_factor
-      discounted_li_total = discounted_li_net
-      if len(line_item["tax_amounts"]) > 0:
-        assert len(line_item["tax_amounts"]) == 1
-        li_tax = decimal.Decimal(line_item["tax_amounts"][0]["amount"]) / 100
-        if not line_item["tax_amounts"][0]["inclusive"]:
-          discounted_li_total += li_tax
+      li_amount_with_tax = li_amount_net
+      for tax_amount in line_item["tax_amounts"]:
+        if tax_amount["inclusive"]:
+          li_amount_net -= decimal.Decimal(tax_amount["amount"]) / 100
         else:
-          discounted_li_net -= li_tax
+          li_amount_with_tax += decimal.Decimal(tax_amount["amount"]) / 100
 
       line_items.append({
         "line_item_idx": line_item_idx,
         "recognition_start": start,
         "recognition_end": end,
-        "amount_net": discounted_li_net,
+        "amount_net": li_amount_net,
         "text": text,
-        "amount_with_tax": discounted_li_total
+        "amount_with_tax": li_amount_with_tax
       })
 
     revenue_items.append({
