@@ -4,20 +4,6 @@ from datetime import datetime, timezone
 from . import customer, dateparser, output, config, invoices
 
 
-def listChargesRaw(fromTime, toTime):
-  charges = stripe.Charge.list(
-    created={
-      "gte": int(fromTime.timestamp()),
-      "lt": int(toTime.timestamp())
-    },
-    expand=["data.customer", "data.customer.tax_ids", "data.invoice"]
-  ).auto_paging_iter()
-  for charge in charges:
-    if not charge.paid or not charge.captured:
-      continue
-    yield charge
-
-
 def chargeHasInvoice(charge):
   return charge.invoice is not None
 
@@ -120,66 +106,3 @@ def createRevenueItems(charges):
     })
 
   return revenue_items
-
-
-def createAccountingRecords(charges):
-  records = []
-
-  for charge in charges:
-    acc_props = customer.getAccountingProps(
-      customer.retrieveCustomer(charge.customer))
-    created = datetime.fromtimestamp(
-      charge.created, timezone.utc).astimezone(config.accounting_tz)
-
-    balance_transaction = stripe.BalanceTransaction.retrieve(
-      charge.balance_transaction)
-    assert len(balance_transaction.fee_details) == 1
-    assert balance_transaction.fee_details[0].currency == "eur"
-    fee_amount = decimal.Decimal(
-      balance_transaction.fee_details[0].amount) / 100
-    fee_desc = balance_transaction.fee_details[0].description
-
-    if charge.invoice:
-      invoice = invoices.retrieveInvoice(charge.invoice)
-      number = invoice.number
-    else:
-      number = charge.receipt_number
-
-    records.append({
-      "date": created,
-      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(decimal.Decimal(charge.amount) / 100),
-      "Soll/Haben-Kennzeichen": "S",
-      "WKZ Umsatz": "EUR",
-      "Konto": str(config.accounts["bank"]),
-      "Gegenkonto (ohne BU-Schlüssel)": acc_props["customer_account"],
-      "Buchungstext": "Stripe Payment ({})".format(charge.id),
-      "Belegfeld 1": number,
-    })
-
-    records.append({
-      "date": created,
-      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(fee_amount),
-      "Soll/Haben-Kennzeichen": "S",
-      "WKZ Umsatz": "EUR",
-      "Konto": str(config.accounts["stripe_fees"]),
-      "Gegenkonto (ohne BU-Schlüssel)": str(config.accounts["bank"]),
-      "Buchungstext": "{} ({})".format(fee_desc or "Stripe Fee", charge.id),
-    })
-
-    if charge.refunded or len(charge.refunds.data) > 0:
-      assert len(charge.refunds.data) == 1
-      refund = charge.refunds.data[0]
-
-      refund_created = datetime.fromtimestamp(refund.created, timezone.utc)
-      records.append({
-        "date": refund_created,
-        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(decimal.Decimal(refund.amount) / 100),
-        "Soll/Haben-Kennzeichen": "H",
-        "WKZ Umsatz": "EUR",
-        "Konto": str(config.accounts["bank"]),
-        "Gegenkonto (ohne BU-Schlüssel)": acc_props["customer_account"],
-        "Buchungstext": "Stripe Payment Refund ({})".format(charge.id),
-        "Belegfeld 1": number,
-      })
-
-  return records

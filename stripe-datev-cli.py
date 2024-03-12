@@ -9,11 +9,10 @@ import stripe_datev.invoices
 import \
   stripe_datev.charges, \
   stripe_datev.customer, \
-  stripe_datev.payouts, \
   stripe_datev.recognition, \
   stripe_datev.output, \
   stripe_datev.config, \
-  stripe_datev.transfers
+  stripe_datev.balance
 import os
 import os.path
 import requests
@@ -70,8 +69,8 @@ class StripeDatevCli(object):
       fromTime = stripe_datev.config.accounting_tz.localize(
         datetime(year, 1, 1, 0, 0, 0, 0))
       toTime = fromTime + datedelta.YEAR
-    print("Retrieving data between {} and {}".format(fromTime.strftime(
-      "%Y-%m-%d"), (toTime - timedelta(0, 1)).strftime("%Y-%m-%d")))
+    print("Retrieving data between {} and {} (inclusive, {})".format(fromTime.strftime(
+      "%Y-%m-%d"), (toTime - timedelta(0, 1)).strftime("%Y-%m-%d"), stripe_datev.config.accounting_tz))
     thisMonth = fromTime.astimezone(
       stripe_datev.config.accounting_tz).strftime("%Y-%m")
 
@@ -82,9 +81,11 @@ class StripeDatevCli(object):
 
     revenue_items = stripe_datev.invoices.createRevenueItems(invoices)
 
-    charges = list(stripe_datev.charges.listChargesRaw(fromTime, toTime))
-    print("Retrieved {} charge(s), total {} EUR".format(
-      len(charges), sum([decimal.Decimal(c.amount) / 100 for c in charges])))
+    balance_transactions = list(reversed(list(stripe_datev.balance.listBalanceTransactions(
+      fromTime, toTime))))
+    charges = stripe_datev.balance.extractCharges(balance_transactions)
+    print("Retrieved {} balance transaction(s), {} charge(s), total {} EUR".format(len(
+      balance_transactions), len(charges), sum([decimal.Decimal(charge.amount) / 100 for charge in charges])))
 
     direct_charges = list(filter(
       lambda charge: not stripe_datev.charges.chargeHasInvoice(charge), charges))
@@ -131,59 +132,13 @@ class StripeDatevCli(object):
       stripe_datev.output.writeRecords(os.path.join(
         datevDir, name), records, bezeichung="Stripe Revenue {} from {}".format(month, thisMonth))
 
-    # Datev charges
+    # Datev Balance
 
-    charge_records = stripe_datev.charges.createAccountingRecords(charges)
-
-    charges_by_month = {}
-    for record in charge_records:
-      month = record["date"].strftime("%Y-%m")
-      charges_by_month[month] = charges_by_month.get(month, []) + [record]
-
-    for month, records in charges_by_month.items():
-      if month == thisMonth:
-        name = "EXTF_{}_Charges.csv".format(thisMonth)
-      else:
-        name = "EXTF_{}_Charges_From_{}.csv".format(month, thisMonth)
-      stripe_datev.output.writeRecords(os.path.join(
-        datevDir, name), records, bezeichung="Stripe Charges/Fees {} from {}".format(month, thisMonth))
-
-    # Datev transfers
-
-    transfers = list(stripe_datev.transfers.listTransfersRaw(fromTime, toTime))
-    print("Retrieved {} transfer(s), total {} EUR".format(
-      len(transfers), sum([decimal.Decimal(c.amount) / 100 for c in transfers])))
-
-    transfer_records = stripe_datev.transfers.createAccountingRecords(
-      transfers)
-    stripe_datev.output.writeRecords(os.path.join(datevDir, "EXTF_{}_Transfers.csv".format(
-      thisMonth)), transfer_records, bezeichung="Stripe Transfers {}".format(thisMonth))
-
-    # Datev payouts
-
-    payoutObjects = list(stripe_datev.payouts.listPayouts(fromTime, toTime))
-    print("Retrieved {} payout(s), total {} EUR".format(
-      len(payoutObjects), sum([r["amount"] for r in payoutObjects])))
-
-    payout_records = stripe_datev.payouts.createAccountingRecords(
-      payoutObjects)
-    stripe_datev.output.writeRecords(os.path.join(datevDir, "EXTF_{}_Payouts.csv".format(
-      thisMonth)), payout_records, bezeichung="Stripe Payouts {}".format(thisMonth))
-
-    balance_transactions = list(stripe.BalanceTransaction.list(
-      created={
-        "lt": int(toTime.timestamp()),
-        "gte": int(fromTime.timestamp()),
-      },
-      type="contribution",
-    ).auto_paging_iter())
-    print("Retrieved {} contribution(s), total {} EUR".format(len(balance_transactions), sum(
-      [-decimal.Decimal(b["amount"]) / 100 for b in balance_transactions])))
-
-    contribution_records = stripe_datev.payouts.createAccountingRecordsContributions(
+    balance_records = stripe_datev.balance.createAccountingRecords(
       balance_transactions)
-    stripe_datev.output.writeRecords(os.path.join(datevDir, "EXTF_{}_Contributions.csv".format(
-      thisMonth)), contribution_records, bezeichung="Stripe Contributions {}".format(thisMonth))
+
+    stripe_datev.output.writeRecords(os.path.join(datevDir, "EXTF_{}_Balance.csv".format(
+      thisMonth)), balance_records, bezeichung="Stripe Balance {}".format(thisMonth))
 
     # PDF
 
@@ -211,7 +166,7 @@ class StripeDatevCli(object):
       with open(filePath, "wb") as fp:
         fp.write(r.content)
 
-    for charge in charges:
+    for charge in charges + list(map(lambda tx: tx["source"]["destination_payment"], filter(lambda tx: tx["type"] == "transfer", balance_transactions))):
       fileName = "{} {}.html".format(datetime.fromtimestamp(
         charge.created, timezone.utc).strftime("%Y-%m-%d"), charge.receipt_number or charge.id)
       filePath = os.path.join(pdfDir, fileName)
