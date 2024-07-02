@@ -93,11 +93,14 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
   country = address.country
 
   invoice_tax = None
+  invoice_total = None
   if invoice is not None:
     invoice_tax = invoice.get("tax", None)
+    invoice_total = invoice.get("total", None)
   elif checkout_session is not None:
     invoice_tax = checkout_session.get(
       "total_details", {}).get("amount_tax", None)
+    invoice_total = checkout_session.get("amount_total", None)
 
   # use tax status at time of invoice creation
   if invoice is not None and "customer_tax_exempt" in invoice and not invoice["automatic_tax"]["enabled"]:
@@ -128,7 +131,7 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
   if country in country_codes_eu:
     props["vat_region"] = "EU"
 
-  if tax_exempt == "reverse" or tax_exempt == "exempt" or invoice_tax is None or invoice_tax == 0:
+  if tax_exempt == "reverse" or tax_exempt == "exempt" or invoice_tax is None or (invoice_tax == 0 and invoice_total is not None and invoice_total > 0):
     if invoice is not None:
       if tax_exempt == "exempt":
         print("Warning: tax exempt customer, treating like 'reverse'", customer.id)
