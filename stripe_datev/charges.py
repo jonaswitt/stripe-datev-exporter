@@ -56,7 +56,7 @@ def createRevenueItems(charges):
       else:
         raise NotImplementedError(
           "Handling of partially refunded charges is not implemented yet")
-    if "in_" in charge.description:
+    if charge.description is not None and "in_" in charge.description:
       print("Skipping charge referencing invoice",
             charge.id, charge.description)
       continue
