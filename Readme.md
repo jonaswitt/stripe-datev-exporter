@@ -24,3 +24,7 @@ Then install dependencies:
 ```
 pip install -r requirements.txt
 ```
+
+## Notes
+
+Run the `fill_account_numbers` command before `download`. This assigns the `accountNumber` metadata to each customer, this will be the account number for all booking records related to this customer. You can assign the `accountNumber` metadata using a different approach, if you like, but every customer (which has any transactions) needs this metadata.
