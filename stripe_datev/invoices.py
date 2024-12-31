@@ -299,8 +299,8 @@ def createAccountingRecords(revenue_item):
     if len(forward_months) > 0 and forward_amount != 0:
       records.append({
         "date": created,
-        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(forward_amount),
-        "Soll/Haben-Kennzeichen": "S",
+        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(abs(forward_amount)),
+        "Soll/Haben-Kennzeichen": "S" if forward_amount >= 0 else "H",
         "WKZ Umsatz": "EUR",
         "Konto": accounting_props["revenue_account"],
         "Gegenkonto (ohne BU-Schlüssel)": str(config.accounts["prap"]),
@@ -313,8 +313,8 @@ def createAccountingRecords(revenue_item):
         records.append({
           # If invoice was voided/etc., resolve all pRAP in that month, don't keep going into the future
           "date": voided_at or marked_uncollectible_at or credited_at or month["start"],
-          "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(month["amounts"][0]),
-          "Soll/Haben-Kennzeichen": "S",
+          "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(abs(month["amounts"][0])),
+          "Soll/Haben-Kennzeichen": "S" if month["amounts"][0] >= 0 else "H",
           "WKZ Umsatz": "EUR",
           "Konto": str(config.accounts["prap"]),
           "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
