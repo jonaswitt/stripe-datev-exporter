@@ -147,6 +147,10 @@ def createAccountingRecords(balance_transactions):
         "Belegfeld 1": created.astimezone(timezone.utc).strftime("%Y-%m"),
       })
 
+    elif tx["type"] == "payout_minimum_balance_hold" or tx["type"] == "payout_minimum_balance_release":
+      # Not relevant for accounting on the company side
+      pass
+
     else:
       print(
         "Warning: unsupported balance transaction type:", tx["type"], tx["id"])
