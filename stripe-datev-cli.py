@@ -17,6 +17,7 @@ import os
 import os.path
 import requests
 import dotenv
+import pytz
 
 dotenv.load_dotenv()
 
@@ -45,7 +46,8 @@ class StripeDatevCli(object):
       'validate_customers',
       'fill_account_numbers',
       'list_accounts',
-      'opos'
+      'opos',
+      'fees'
     ])
 
     args = parser.parse_args(argv[1:2])
@@ -265,6 +267,42 @@ class StripeDatevCli(object):
     total = reduce(lambda x, y: x + y, totals, decimal.Decimal(0))
     print("TOTAL        ", format(total, ",.2f").rjust(10, " "), "EUR")
 
+  def fees(self, argv):
+    parser = argparse.ArgumentParser(prog="stripe-datev-cli.py fees")
+    parser.add_argument('year', type=int, help='year to download data for')
+    parser.add_argument('month', type=int, help='month to download data for')
+
+    args = parser.parse_args(argv)
+
+    year = int(args.year)
+    month = int(args.month)
+
+    # Stripe invoices fees within the bounds of one UTC month
+    fromTime = pytz.utc.localize(datetime(year, month, 1, 0, 0, 0, 0))
+    toTime = pytz.utc.localize(
+      datetime(year, month + 1, 1, 0, 0, 0, 0) if month <= 11 else datetime(year + 1, 1, 1, 0, 0, 0, 0))
+
+    print("Retrieving data between {} and {} (inclusive, {})".format(fromTime.strftime(
+      "%Y-%m-%d"), (toTime - timedelta(0, 1)).strftime("%Y-%m-%d"), timezone.utc))
+
+    balance_transactions = list(reversed(list(stripe_datev.balance.listBalanceTransactions(
+      fromTime, toTime))))
+    print("Retrieved {} balance transaction(s)".format(len(balance_transactions)))
+
+    records = stripe_datev.balance.createAccountingRecords(balance_transactions)
+
+    feesTotal = 0
+    contributionsTotal = 0
+
+    for record in records:
+      amount = decimal.Decimal(record["Umsatz (ohne Soll/Haben-Kz)"].replace(",", "."))
+      if record["Konto"] == str(stripe_datev.config.accounts["stripe_fees"]):
+        feesTotal += amount
+      elif record["Konto"] == str(stripe_datev.config.accounts["contributions"]):
+        contributionsTotal += amount
+
+    print("Fees: {0:.2f} EUR".format(feesTotal))
+    print("Contributions {0:.2f} EUR".format(contributionsTotal))
 
 if __name__ == '__main__':
   StripeDatevCli().run(sys.argv)
