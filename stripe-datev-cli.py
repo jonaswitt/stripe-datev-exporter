@@ -64,11 +64,13 @@ class StripeDatevCli(object):
     if month > 0:
       fromTime = stripe_datev.config.accounting_tz.localize(
         datetime(year, month, 1, 0, 0, 0, 0))
-      toTime = fromTime + datedelta.MONTH
+      toTime = stripe_datev.config.accounting_tz.localize(
+        datetime(year, month + 1, 1, 0, 0, 0, 0) if month <= 11 else datetime(year + 1, 1, 1, 0, 0, 0, 0))
     else:
       fromTime = stripe_datev.config.accounting_tz.localize(
         datetime(year, 1, 1, 0, 0, 0, 0))
-      toTime = fromTime + datedelta.YEAR
+      toTime = stripe_datev.config.accounting_tz.localize(
+        datetime(year + 1, 1, 1, 0, 0, 0, 0))
     print("Retrieving data between {} and {} (inclusive, {})".format(fromTime.strftime(
       "%Y-%m-%d"), (toTime - timedelta(0, 1)).strftime("%Y-%m-%d"), stripe_datev.config.accounting_tz))
     thisMonth = fromTime.astimezone(
