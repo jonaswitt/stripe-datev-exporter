@@ -47,7 +47,8 @@ class StripeDatevCli(object):
       'fill_account_numbers',
       'list_accounts',
       'opos',
-      'fees'
+      'fees',
+      'preview'
     ])
 
     args = parser.parse_args(argv[1:2])
@@ -303,6 +304,41 @@ class StripeDatevCli(object):
 
     print("Fees: {0:.2f} EUR".format(feesTotal))
     print("Contributions {0:.2f} EUR".format(contributionsTotal))
+
+  def preview(self, argv):
+    object_id = argv[0]
+    if object_id.startswith("in_"):
+      invoice = stripe_datev.invoices.retrieveInvoice(object_id)
+      print("Previewing accounting records for invoice {} / {}".format(object_id, invoice["number"]))
+      revenue_items = stripe_datev.invoices.createRevenueItems([invoice])
+      records = []
+      for revenue_item in revenue_items:
+        records += stripe_datev.invoices.createAccountingRecords(revenue_item)
+    elif object_id.startswith("ch_"):
+      charge = stripe.Charge.retrieve(object_id)
+      print("Previewing accounting records for charge {}".format(object_id))
+      revenue_items = stripe_datev.charges.createRevenueItems([charge])
+      records = []
+      for revenue_item in revenue_items:
+        records += stripe_datev.invoices.createAccountingRecords(revenue_item)
+    elif object_id.startswith("txn_"):
+      balance_transaction = stripe.BalanceTransaction.retrieve(object_id)
+      print("Previewing accounting records for balance transaction {}".format(object_id))
+      records = stripe_datev.balance.createAccountingRecords([balance_transaction])
+    else:
+      raise "Unsupported object ID for preview"
+
+    records_by_month = {}
+    for record in records:
+      month = record["date"].strftime("%Y-%m")
+      records_by_month[month] = records_by_month.get(month, []) + [record]
+
+    for month in sorted(records_by_month.keys()):
+      records = records_by_month[month]
+      print()
+      print(month)
+      for record in sorted(records, key=lambda r: [r["date"], r["Belegfeld 1"], r["Konto"], r["Gegenkonto (ohne BU-Schlüssel)"]]):
+        print(record['date'].strftime("%Y-%m-%d"), record['Umsatz (ohne Soll/Haben-Kz)'], record["Soll/Haben-Kennzeichen"], record['Konto'], record['Gegenkonto (ohne BU-Schlüssel)'], '--', record['Buchungstext'])
 
 if __name__ == '__main__':
   StripeDatevCli().run(sys.argv)
