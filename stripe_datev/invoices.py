@@ -272,12 +272,49 @@ def createAccountingRecords(revenue_item):
         "EU-Land u. UStID": eu_vat_id,
       })
 
-  # If invoice was voided, marked uncollectible or credited fully in same month,
-  # don't bother with pRAP
-  if voided_at is not None and voided_at.strftime("%Y-%m") == created.strftime("%Y-%m") or \
-          marked_uncollectible_at is not None and marked_uncollectible_at.strftime("%Y-%m") == created.strftime("%Y-%m") or \
-          credited_at is not None and credited_at.strftime("%Y-%m") == created.strftime("%Y-%m") and credited_amount == amount_with_tax:
-    return records
+  prap_records = []
+  def apply_prap(date, start, end, amount):
+    # print("apply_prap", date, start, end, amount)
+
+    months = recognition.split_months(start, end, [amount])
+
+    base_months = list(filter(lambda month: month["start"] <= date, months))
+    base_amount = sum(map(lambda month: month["amounts"][0], base_months))
+
+    forward_amount = amount - base_amount
+    forward_months = list(
+      filter(lambda month: month["start"] > date, months))
+
+    if len(forward_months) == 0:
+      return
+
+    prap_records.append({
+      "date": date,
+      "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(abs(forward_amount)),
+      "Soll/Haben-Kennzeichen": "S" if forward_amount >= 0 else "H",
+      "WKZ Umsatz": "EUR",
+      "Konto": accounting_props["revenue_account"],
+      "Gegenkonto (ohne BU-Schlüssel)": str(config.accounts["prap"]),
+      "Buchungstext": "pRAP nach {} / {}".format("{}..{}".format(forward_months[0]["start"].strftime("%Y-%m"), forward_months[-1]["start"].strftime("%Y-%m")) if len(forward_months) > 1 else forward_months[0]["start"].strftime("%Y-%m"), text),
+      "Belegfeld 1": number,
+      "EU-Land u. UStID": eu_vat_id,
+    })
+
+    for month in forward_months:
+      prap_records.append({
+        # If invoice was voided/etc., resolve all pRAP in that month, don't keep going into the future
+        "date": month["start"],
+        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(abs(month["amounts"][0])),
+        "Soll/Haben-Kennzeichen": "S" if month["amounts"][0] >= 0 else "H",
+        "WKZ Umsatz": "EUR",
+        "Konto": str(config.accounts["prap"]),
+        "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
+        "Buchungstext": "pRAP aus {} / {}".format(date.strftime("%Y-%m"), text),
+        "Belegfeld 1": number,
+        "EU-Land u. UStID": eu_vat_id,
+      })
+
+    assert sum(map(lambda month: month["amounts"][0], forward_months)) == forward_amount
 
   for line_item in line_items:
     amount_with_tax = line_item["amount_with_tax"]
@@ -285,43 +322,33 @@ def createAccountingRecords(revenue_item):
     recognition_end = line_item["recognition_end"]
     text = line_item["text"]
 
-    months = recognition.split_months(
-      recognition_start, recognition_end, [amount_with_tax])
+    apply_prap(created, recognition_start, recognition_end, amount_with_tax)
 
-    base_months = list(filter(lambda month: month["start"] <= created, months))
-    base_amount = sum(map(lambda month: month["amounts"][0], base_months))
+    if voided_at:
+      apply_prap(voided_at, recognition_start, recognition_end, -amount_with_tax)
+    elif marked_uncollectible_at:
+      apply_prap(marked_uncollectible_at, recognition_start, recognition_end, -amount_with_tax)
+    elif credited_at:
+      if len(line_items) == 1:
+        credited_amount_li = credited_amount
+      else:
+        credited_amount_li = credited_amount * (amount_with_tax / revenue_item["amount_with_tax"]) # TODO: rounding issues?
+      apply_prap(credited_at, recognition_start, recognition_end, -credited_amount_li)
 
-    forward_amount = amount_with_tax - base_amount
+  prap_records_by_month = {}
+  for record in prap_records:
+    month = record["date"].strftime("%Y-%m")
+    if month not in prap_records_by_month:
+      prap_records_by_month[month] = []
+    prap_records_by_month[month].append(record)
 
-    forward_months = list(
-      filter(lambda month: month["start"] > created, months))
-
-    if len(forward_months) > 0 and forward_amount != 0:
-      records.append({
-        "date": created,
-        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(abs(forward_amount)),
-        "Soll/Haben-Kennzeichen": "S" if forward_amount >= 0 else "H",
-        "WKZ Umsatz": "EUR",
-        "Konto": accounting_props["revenue_account"],
-        "Gegenkonto (ohne BU-Schlüssel)": str(config.accounts["prap"]),
-        "Buchungstext": "pRAP nach {} / {}".format("{}..{}".format(forward_months[0]["start"].strftime("%Y-%m"), forward_months[-1]["start"].strftime("%Y-%m")) if len(forward_months) > 1 else forward_months[0]["start"].strftime("%Y-%m"), text),
-        "Belegfeld 1": number,
-        "EU-Land u. UStID": eu_vat_id,
-      })
-
-      for month in forward_months:
-        records.append({
-          # If invoice was voided/etc., resolve all pRAP in that month, don't keep going into the future
-          "date": voided_at or marked_uncollectible_at or credited_at or month["start"],
-          "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(abs(month["amounts"][0])),
-          "Soll/Haben-Kennzeichen": "S" if month["amounts"][0] >= 0 else "H",
-          "WKZ Umsatz": "EUR",
-          "Konto": str(config.accounts["prap"]),
-          "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
-          "Buchungstext": "pRAP aus {} / {}".format(created.strftime("%Y-%m"), text),
-          "Belegfeld 1": number,
-          "EU-Land u. UStID": eu_vat_id,
-        })
+  # If all pRAP records are in the same month, don't emit them
+  if len(prap_records_by_month) > 1:
+    for month in prap_records_by_month.keys():
+      # If all records in a month cancel each other out, don't emit them
+      month_total = sum(map(lambda r: decimal.Decimal(r["Umsatz (ohne Soll/Haben-Kz)"].replace(",", ".")) * (1 if r["Soll/Haben-Kennzeichen"] == "S" else -1) * (-1 if r["Konto"] == str(config.accounts["prap"]) else 1), prap_records_by_month[month]))
+      if month_total != 0:
+        records += prap_records_by_month[month]
 
   return records
 
