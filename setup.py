@@ -6,7 +6,7 @@ setup(
     packages=['stripe_datev',],
     install_requires=[
       'stripe',
-    ]
+    ],
     url='https://github.com/jonaswitt/stripe-datev-exporter',
     author='Jonas Witt',
     author_email='mail@jonaswitt.com',
