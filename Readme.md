@@ -3,27 +3,13 @@
 ## Requirements
 
 - Tested on Python 3.9 - 3.12
-- Dependencies listed in `requirements.txt`
+- Dependencies listed in `pyproject.toml` (uv) and `requirements.txt` (pip)
 
 ## Environment
 
-Consider using Python's [virtualenv](https://pypi.org/project/virtualenv/) or alternatives. To setup virtualenv initially:
+Consider using [uv](https://docs.astral.sh/uv/) or Python's [virtualenv](https://pypi.org/project/virtualenv/) or alternatives.
 
-```
-virtualenv -p python3 venv
-```
-
-To activate in your current shell:
-
-```
-. venv/bin/activate
-```
-
-Then install dependencies:
-
-```
-pip install -r requirements.txt
-```
+When using uv, in the commands below replace `python stripe-datev-cli.py` with `uv run stripe-datev-cli.py`.
 
 ## How to Use
 
