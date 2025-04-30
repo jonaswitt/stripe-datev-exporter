@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Tested on Python 3.9
+- Tested on Python 3.9 - 3.12
 - Dependencies listed in `requirements.txt`
 
 ## Environment
