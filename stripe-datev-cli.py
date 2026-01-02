@@ -163,6 +163,8 @@ class StripeDatevCli(object):
         # print("{} exists, skipping".format(filePath))
         continue
 
+      if not pdfLink:
+        continue
       print("Downloading {} to {}".format(pdfLink, filePath))
       r = requests.get(pdfLink)
       if r.status_code != 200:
@@ -180,6 +182,8 @@ class StripeDatevCli(object):
         continue
 
       pdfLink = charge["receipt_url"]
+      if not pdfLink:
+        continue
       print("Downloading {} to {}".format(pdfLink, filePath))
       r = requests.get(pdfLink)
       if r.status_code != 200:
