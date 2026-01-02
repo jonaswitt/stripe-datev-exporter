@@ -168,19 +168,6 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
   props["revenue_account"] = str(config.accounts["revenue_german_vat"])
   return props
 
-
-def getRevenueAccount(customer, invoice=None, checkout_session=None):
-  return getAccountingProps(customer, invoice=invoice, checkout_session=checkout_session)["revenue_account"]
-
-
-def getCustomerAccount(customer, invoice=None, checkout_session=None):
-  return getAccountingProps(customer, invoice=invoice, checkout_session=checkout_session)["customer_account"]
-
-
-def getDatevTaxKey(customer, invoice=None, checkout_session=None):
-  return getAccountingProps(customer, invoice=invoice, checkout_session=checkout_session)["datev_tax_key"]
-
-
 def validate_customers():
   customer_count = 0
   for customer in stripe.Customer.list(expand=["data.tax_ids"]).auto_paging_iter():
