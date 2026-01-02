@@ -220,7 +220,7 @@ def createAccountingRecords(revenue_item):
       "WKZ Umsatz": "EUR",
       "Konto": accounting_props["customer_account"],
       "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
-      "BU-Schlüssel": accounting_props["datev_tax_key"],
+      "BU-Schlüssel": accounting_props["datev_tax_key_invoice"],
       "Buchungstext": text,
       "Belegfeld 1": number,
       "EU-Land u. UStID": eu_vat_id,
@@ -235,7 +235,7 @@ def createAccountingRecords(revenue_item):
         "WKZ Umsatz": "EUR",
         "Konto": accounting_props["customer_account"],
         "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
-        "BU-Schlüssel": accounting_props["datev_tax_key"],
+        "BU-Schlüssel": accounting_props["datev_tax_key_invoice"],
         "Buchungstext": "Storno {}".format(text),
         "Belegfeld 1": number,
         "EU-Land u. UStID": eu_vat_id,
@@ -251,7 +251,7 @@ def createAccountingRecords(revenue_item):
         "WKZ Umsatz": "EUR",
         "Konto": accounting_props["customer_account"],
         "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
-        "BU-Schlüssel": accounting_props["datev_tax_key"],
+        "BU-Schlüssel": accounting_props["datev_tax_key_invoice"],
         "Buchungstext": "Storno {}".format(text),
         "Belegfeld 1": number,
         "EU-Land u. UStID": eu_vat_id,
@@ -266,7 +266,7 @@ def createAccountingRecords(revenue_item):
         "WKZ Umsatz": "EUR",
         "Konto": accounting_props["customer_account"],
         "Gegenkonto (ohne BU-Schlüssel)": accounting_props["revenue_account"],
-        "BU-Schlüssel": accounting_props["datev_tax_key"],
+        "BU-Schlüssel": accounting_props["datev_tax_key_invoice"],
         "Buchungstext": "Erstattung {}".format(text),
         "Belegfeld 1": number,
         "EU-Land u. UStID": eu_vat_id,
@@ -408,7 +408,7 @@ def to_csv(inv):
 
       props["customer_account"],
       props["revenue_account"],
-      props["datev_tax_key"],
+      props["datev_tax_key_invoice"],
     ])
 
   return csv.lines_to_csv(lines)

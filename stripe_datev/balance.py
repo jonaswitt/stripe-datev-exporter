@@ -43,6 +43,7 @@ def createAccountingRecords(balance_transactions):
         "WKZ Umsatz": "EUR",
         "Konto": str(config.accounts["bank"]),
         "Gegenkonto (ohne BU-Schlüssel)": accounting_props["customer_account"],
+        "BU-Schlüssel": accounting_props["datev_tax_key_payment"],
         "Buchungstext": "Stripe Payment ({})".format(charge.id),
         "Belegfeld 1": number,
       })

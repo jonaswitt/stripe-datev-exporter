@@ -346,7 +346,7 @@ class StripeDatevCli(object):
       print()
       print(month)
       for record in sorted(records, key=lambda r: [r["date"], r["Belegfeld 1"], r["Konto"], r["Gegenkonto (ohne BU-Schlüssel)"]]):
-        print(record['date'].strftime("%Y-%m-%d"), record['Umsatz (ohne Soll/Haben-Kz)'], record["Soll/Haben-Kennzeichen"], record['Konto'], record['Gegenkonto (ohne BU-Schlüssel)'], '--', record['Buchungstext'])
+        print(record['date'].strftime("%Y-%m-%d"), record['Umsatz (ohne Soll/Haben-Kz)'], record["Soll/Haben-Kennzeichen"], record['Konto'], record['Gegenkonto (ohne BU-Schlüssel)'], record.get("BU-Schlüssel", "-") or "-", '--', record['Buchungstext'])
 
 if __name__ == '__main__':
   StripeDatevCli().run(sys.argv)

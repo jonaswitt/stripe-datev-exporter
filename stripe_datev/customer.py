@@ -115,7 +115,8 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
     "vat_id": vat_id,
     "tax_exempt": tax_exempt,
     "invoice_tax": invoice_tax,
-    "datev_tax_key": "",
+    "datev_tax_key_invoice": "",
+    "datev_tax_key_payment": "",
   })
 
   if country == "DE":
@@ -124,7 +125,8 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
     if tax_exempt != "none":
       print("Warning: DE customer tax status is", tax_exempt, customer.id)
     props["revenue_account"] = str(config.accounts["revenue_german_vat"])
-    props["datev_tax_key"] = str(config.accounts["datev_tax_key_germany"])
+    props["datev_tax_key_invoice"] = str(config.accounts["datev_tax_key_germany_invoice"])
+    props["datev_tax_key_payment"] = str(config.accounts["datev_tax_key_germany_payment"])
     props["vat_region"] = "DE"
     return props
 
@@ -153,8 +155,10 @@ def getAccountingProps(customer, invoice=None, checkout_session=None):
       props["revenue_account"] = str(
         config.accounts["account_reverse_charge_world"])
 
-    props["datev_tax_key"] = str(
-      config.accounts["datev_tax_key_reverse"])
+    props["datev_tax_key_invoice"] = str(
+      config.accounts["datev_tax_key_reverse_invoice"])
+    props["datev_tax_key_payment"] = str(
+      config.accounts["datev_tax_key_reverse_payment"])
     return props
 
   elif tax_exempt == "none":
