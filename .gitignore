@@ -42,5 +42,6 @@ config.toml
 
 .DS_Store
 out/*
+out
 
 upload*.sh
