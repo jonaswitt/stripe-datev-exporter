@@ -326,7 +326,11 @@ class StripeDatevCli(object):
       for revenue_item in revenue_items:
         records += stripe_datev.invoices.createAccountingRecords(revenue_item)
     elif object_id.startswith("txn_"):
-      balance_transaction = stripe.BalanceTransaction.retrieve(object_id)
+      balance_transaction = stripe.BalanceTransaction.retrieve(object_id, expand=["source", "source.customer",
+              "source.customer.tax_ids", "source.invoice", "source.charge",
+              "source.charge.customer", "source.charge.invoice",
+              "source.source_transaction", "source.source_transaction.invoice",
+              "source.destination", "source.destination_payment"])
       print("Previewing accounting records for balance transaction {}".format(object_id))
       records = stripe_datev.balance.createAccountingRecords([balance_transaction])
     else:
