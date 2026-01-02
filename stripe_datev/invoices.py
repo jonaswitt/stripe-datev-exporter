@@ -568,18 +568,3 @@ def accrualRecords(invoiceDate, invoiceAmount, customerAccount, revenueAccount, 
     remainingAmount -= periodAmount
 
   return records
-
-
-def listCreditNotes(fromTime, toTime):
-  creditNotes = stripe.CreditNote.list(
-    expand=["data.invoice"]).auto_paging_iter()
-
-  for creditNote in creditNotes:
-    created = datetime.fromtimestamp(
-      creditNote.created, timezone.utc).astimezone(config.accounting_tz)
-    if created >= toTime:
-      continue
-    if created < fromTime:
-      break
-
-    yield creditNote

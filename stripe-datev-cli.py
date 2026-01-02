@@ -194,21 +194,30 @@ class StripeDatevCli(object):
 
     # Warnings about changes to earlier invoices
 
-    for invoice in stripe.Invoice.list(
-        created={
-            "lt": int(fromTime.timestamp()),
-            "gte": int((fromTime - 6 * datedelta.MONTH).timestamp()),
-        },
-    ).auto_paging_iter():
-      if (invoice.status_transitions.voided_at and datetime.fromtimestamp(
-        invoice.status_transitions.voided_at, timezone.utc) >= fromTime) or (invoice.status_transitions.marked_uncollectible_at and datetime.fromtimestamp(
-            invoice.status_transitions.marked_uncollectible_at, timezone.utc) >= fromTime
-        ):
-        print("Warning: found earlier invoice {} voided or marked uncollectible in this month, consider downloading {} again".format(invoice.id, datetime.fromtimestamp(
-            invoice.status_transitions.finalized_at, timezone.utc).astimezone(stripe_datev.config.accounting_tz).strftime("%Y-%m")))
+    for status in ["uncollectible", "void"]:
+      for invoice in stripe.Invoice.list(
+          created={
+              "lt": int(fromTime.timestamp()),
+              "gte": int((fromTime - 24 * datedelta.MONTH).timestamp()),
+          },
+          status=status,
+      ).auto_paging_iter():
+        if (invoice.status_transitions.voided_at and datetime.fromtimestamp(
+          invoice.status_transitions.voided_at, timezone.utc) >= fromTime and datetime.fromtimestamp(
+          invoice.status_transitions.voided_at, timezone.utc) < toTime) or (invoice.status_transitions.marked_uncollectible_at and datetime.fromtimestamp(
+              invoice.status_transitions.marked_uncollectible_at, timezone.utc) >= fromTime and datetime.fromtimestamp(
+              invoice.status_transitions.marked_uncollectible_at, timezone.utc) < toTime
+          ):
+          print("Warning: found earlier invoice {} changed status to {} in this month, consider downloading {} again".format(invoice.id, status, datetime.fromtimestamp(
+              invoice.status_transitions.finalized_at, timezone.utc).astimezone(stripe_datev.config.accounting_tz).strftime("%Y-%m")))
 
-    creditNotes = stripe_datev.invoices.listCreditNotes(fromTime, toTime)
-    for creditNote in creditNotes:
+    for creditNote in stripe.CreditNote.list(
+        created={
+          "gte": int(fromTime.timestamp()),
+          "lt": int(toTime.timestamp()),
+        },
+        expand=["data.invoice"]
+    ).auto_paging_iter():
       invoiceFinalized = datetime.fromtimestamp(
         creditNote.invoice.status_transitions.finalized_at, timezone.utc).astimezone(stripe_datev.config.accounting_tz)
       if invoiceFinalized < fromTime:
