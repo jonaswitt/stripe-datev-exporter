@@ -242,8 +242,9 @@ class StripeDatevCli(object):
     else:
       ref = datetime.now()
       status = "open"
+    ref = stripe_datev.config.accounting_tz.localize(ref)
 
-    print("Unpaid invoices as of", stripe_datev.config.accounting_tz.localize(ref))
+    print("Unpaid invoices as of", ref)
 
     invoices = stripe.Invoice.list(
       created={
@@ -257,22 +258,22 @@ class StripeDatevCli(object):
     totals = []
     for invoice in invoices:
       finalized_at = invoice.status_transitions.get("finalized_at", None)
-      if finalized_at is None or datetime.utcfromtimestamp(finalized_at) > ref:
+      if finalized_at is None or datetime.fromtimestamp(finalized_at, tz=timezone.utc) > ref:
         continue
       marked_uncollectible_at = invoice.status_transitions.get(
         "marked_uncollectible_at", None)
-      if marked_uncollectible_at is not None and datetime.utcfromtimestamp(marked_uncollectible_at) <= ref:
+      if marked_uncollectible_at is not None and datetime.fromtimestamp(marked_uncollectible_at, tz=timezone.utc) <= ref:
         continue
       voided_at = invoice.status_transitions.get("voided_at", None)
-      if voided_at is not None and datetime.utcfromtimestamp(voided_at) <= ref:
+      if voided_at is not None and datetime.fromtimestamp(voided_at, tz=timezone.utc) <= ref:
         continue
       paid_at = invoice.status_transitions.get("paid_at", None)
-      if paid_at is not None and datetime.utcfromtimestamp(paid_at) <= ref:
+      if paid_at is not None and datetime.fromtimestamp(paid_at, tz=timezone.utc) <= ref:
         continue
 
       customer = stripe_datev.customer.retrieveCustomer(invoice.customer)
-      due_date = datetime.utcfromtimestamp(
-        invoice.due_date if invoice.due_date else invoice.created)
+      due_date = datetime.fromtimestamp(
+        invoice.due_date if invoice.due_date else invoice.created, tz=timezone.utc)
       total = decimal.Decimal(invoice.total) / 100
       totals.append(total)
       print(invoice.number.ljust(13, " "), format(total, ",.2f").rjust(10, " "), "EUR", customer.email.ljust(
