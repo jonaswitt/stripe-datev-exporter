@@ -26,7 +26,7 @@ def createAccountingRecords(balance_transactions):
     amount = decimal.Decimal(tx.amount) / 100
     fee = decimal.Decimal(tx.fee) / 100
 
-    if tx["type"] == "charge" or tx["type"] == "payment":
+    if tx["reporting_category"] == "charge":
       charge = tx.source
       cus = customer.retrieveCustomer(charge.customer)
       accounting_props = customer.getAccountingProps(cus)
@@ -60,7 +60,7 @@ def createAccountingRecords(balance_transactions):
         "Belegfeld 1": created.astimezone(timezone.utc).strftime("%Y-%m"),
       })
 
-    elif tx["type"] == "payout":
+    elif tx["reporting_category"] == "payout":
       records.append({
         "date": created,
         "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(-amount),
@@ -71,7 +71,7 @@ def createAccountingRecords(balance_transactions):
         "Buchungstext": "Stripe Payout {}".format(tx.source.id),
       })
 
-    elif tx["type"] == "refund" or tx["type"] == "payment_refund":
+    elif tx["reporting_category"] == "refund":
       charge = tx.source.charge
       cus = customer.retrieveCustomer(charge.customer)
       accounting_props = customer.getAccountingProps(cus)
@@ -91,7 +91,7 @@ def createAccountingRecords(balance_transactions):
         "Belegfeld 1": number,
       })
 
-    elif tx["type"] == "contribution":
+    elif tx["reporting_category"] == "contribution":
       records.append({
         "date": created,
         "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(-amount),
@@ -103,7 +103,7 @@ def createAccountingRecords(balance_transactions):
         "Belegfeld 1": created.astimezone(timezone.utc).strftime("%Y-%m"),
       })
 
-    elif tx["type"] == "transfer":
+    elif tx["reporting_category"] == "transfer":
       transfer = tx.source
       net_amount = transfer.amount - \
           ((transfer.source_transaction.application_fee_amount if transfer.source_transaction else None) or 0)
@@ -133,7 +133,7 @@ def createAccountingRecords(balance_transactions):
         "Belegfeld 1": transfer.id,
       })
 
-    elif tx["type"] == "stripe_fee":
+    elif tx["reporting_category"] == "fee":
       records.append({
         "date": created,
         "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(-amount),
@@ -147,13 +147,13 @@ def createAccountingRecords(balance_transactions):
         "Belegfeld 1": created.astimezone(timezone.utc).strftime("%Y-%m"),
       })
 
-    elif tx["type"] == "payout_minimum_balance_hold" or tx["type"] == "payout_minimum_balance_release":
+    elif tx["reporting_category"] == "payout_minimum_balance_hold" or tx["reporting_category"] == "payout_minimum_balance_release":
       # Not relevant for accounting on the company side
       pass
 
     else:
       print(
-        "Warning: unsupported balance transaction type:", tx["type"], tx["id"])
+        "Warning: unsupported balance transaction type:", tx["type"], "reporting_category:", tx["reporting_category"], tx["id"])
 
   return records
 
