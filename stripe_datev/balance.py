@@ -26,7 +26,7 @@ def createAccountingRecords(balance_transactions):
     amount = decimal.Decimal(tx.amount) / 100
     fee = decimal.Decimal(tx.fee) / 100
 
-    if tx["reporting_category"] == "charge":
+    if tx["reporting_category"] == "charge" or tx["reporting_category"] == "charge_failure":
       charge = tx.source
       cus = customer.retrieveCustomer(charge.customer)
       accounting_props = customer.getAccountingProps(cus)
@@ -38,8 +38,8 @@ def createAccountingRecords(balance_transactions):
 
       records.append({
         "date": created,
-        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(amount),
-        "Soll/Haben-Kennzeichen": "S",
+        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(abs(amount)),
+        "Soll/Haben-Kennzeichen": "S" if amount >= 0 else "H",
         "WKZ Umsatz": "EUR",
         "Konto": str(config.accounts["bank"]),
         "Gegenkonto (ohne BU-Schlüssel)": accounting_props["customer_account"],
@@ -49,8 +49,8 @@ def createAccountingRecords(balance_transactions):
 
       records.append({
         "date": created,
-        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(fee),
-        "Soll/Haben-Kennzeichen": "S",
+        "Umsatz (ohne Soll/Haben-Kz)": output.formatDecimal(abs(fee)),
+        "Soll/Haben-Kennzeichen": "S" if fee >= 0 else "H",
         "WKZ Umsatz": "EUR",
         "Konto": str(config.accounts["stripe_fees"]),
         "Gegenkonto (ohne BU-Schlüssel)": str(config.accounts["bank"]),
